@@ -1,0 +1,69 @@
+# Apache Airflow Helm Values - Optimized for 8GB Local VM
+executor: "LocalExecutor"
+
+# Disable components to save memory
+redis:
+  enabled: false
+flower:
+  enabled: false
+pgbouncer:
+  enabled: false
+
+# Database configuration
+data:
+  metadataConnection:
+    # URL connection: postgresql://username:password@host:port/database
+    # Trỏ trực tiếp sang DB deployed bởi chart postgres ở namespace database
+    user: "airflow"
+    pass: "airflowpassword"
+    host: "postgres-postgresql.database.svc.cluster.local"
+    port: 5432
+    db: "airflow"
+
+postgresql:
+  enabled: false # Không dùng postgres đi kèm của chart Airflow, dùng external postgres ở namespace database
+
+# Webserver configuration
+webserver:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  webserverConfig: |
+    from flask_appbuilder.security.manager import AUTH_REMOTE_USER
+    # Tích hợp xác thực từ Header của oauth2-proxy
+    AUTH_TYPE = AUTH_REMOTE_USER
+    AUTH_ROLES_SYNC_AT_LOGIN = True
+    AUTH_USER_REGISTRATION = True
+    AUTH_USER_REGISTRATION_ROLE = "Admin"
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+
+# Disable worker pods since we are using LocalExecutor
+workers:
+  enabled: false
+
+# Triggerer configuration (optional, reduce resource)
+triggerer:
+  enabled: false
+
+# Mount local DAGs folder or volume
+dags:
+  persistence:
+    enabled: true
+    size: 2Gi
+    accessMode: ReadWriteOnce
+    storageClassName: local-path # Storage class mặc định của K3s

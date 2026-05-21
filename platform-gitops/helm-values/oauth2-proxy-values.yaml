@@ -1,0 +1,32 @@
+# oauth2-proxy values.yaml
+config:
+  clientID: "airflow-client"
+  clientSecret: "your-keycloak-client-secret" # Thay thế bằng secret sinh từ Keycloak
+  # openssl rand -base64 32 | tr -- '+/' '-_'
+  cookieSecret: "ZDFhMkIzYzRkNURlRmdoSWpLbU5vUHFSc1R1VndYeVo=" 
+  configFile: |-
+    provider = "oidc"
+    oidc_issuer_url = "http://auth.local/realms/data-platform"
+    redirect_url = "http://airflow.local/oauth2/callback"
+    upstreams = [
+        "http://airflow-webserver.airflow.svc.cluster.local:8080"
+    ]
+    email_domains = ["*"]
+    set_xauthrequest = true
+    pass_user_headers = true
+    cookie_secure = false # Tắt HTTPS requirement cho local dev
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+ingress:
+  enabled: true
+  className: traefik
+  path: /
+  hosts:
+    - airflow.local

@@ -1,0 +1,29 @@
+# Keycloak Helm values for Local K3s
+replicaCount: 1
+
+auth:
+  adminUser: admin
+  adminPassword: adminpassword
+
+# PostgreSQL DB Configuration
+postgresql:
+  enabled: true # Keycloak sử dụng DB của chính nó cho đơn giản, tự cô lập
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "200m"
+        memory: "512Mi"
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1024Mi"
