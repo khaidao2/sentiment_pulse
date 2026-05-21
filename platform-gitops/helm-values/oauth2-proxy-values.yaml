@@ -1,7 +1,7 @@
 # oauth2-proxy values.yaml
 config:
   clientID: "airflow-client"
-  clientSecret: "your-keycloak-client-secret" # Thay thế bằng secret sinh từ Keycloak
+  clientSecret: "XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I" # Thay thế bằng secret sinh từ Keycloak
   # openssl rand -base64 32 | tr -- '+/' '-_'
   cookieSecret: "ZDFhMkIzYzRkNURlRmdoSWpLbU5vUHFSc1R1VndYeVo=" 
   configFile: |-
