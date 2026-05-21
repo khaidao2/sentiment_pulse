@@ -67,3 +67,13 @@ dags:
     size: 2Gi
     accessMode: ReadWriteOnce
     storageClassName: local-path # Storage class mặc định của K3s
+
+# Tương thích với ArgoCD: Tắt Helm Hooks cho các Job để ArgoCD tự quản lý vòng đời
+createUserJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+
+migrateDatabaseJob:
+  enabled: true
+  useHelmHooks: false
+  applyCustomEnv: false
