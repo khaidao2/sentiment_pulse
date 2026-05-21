@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    # Bảo Traefik kết nối tới Pod argocd-server bằng giao thức HTTPS (vì mặc định pod chạy SSL)
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+spec:
+  rules:
+    - host: argocd.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
