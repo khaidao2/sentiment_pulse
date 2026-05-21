@@ -13,6 +13,8 @@ spec:
     targetRevision: 12.12.10
     helm:
       parameters:
+        - name: image.repository
+          value: "bitnamilegacy/postgresql"
         - name: auth.database
           value: "airflow"
         - name: auth.username

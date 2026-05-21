@@ -5,8 +5,13 @@ auth:
   adminUser: admin
   adminPassword: adminpassword
 
+image:
+  repository: bitnamilegacy/keycloak
+
 # PostgreSQL DB Configuration
 postgresql:
+  image:
+    repository: bitnamilegacy/postgresql
   enabled: true # Keycloak sử dụng DB của chính nó cho đơn giản, tự cô lập
   primary:
     persistence:
