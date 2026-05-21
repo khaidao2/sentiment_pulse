@@ -13,8 +13,8 @@ spec:
       targetRevision: 1.13.0
       helm:
         valueFiles:
-          - $values/helm-values/airflow-values.yaml
-    - repoURL: 'https://github.com/your-org/platform-gitops.git' # Thay bằng URL git của bạn
+          - $values/platform-gitops/helm-values/airflow-values.yaml
+    - repoURL: 'https://github.com/khaidao2/sentiment_pulse'
       targetRevision: HEAD
       ref: values
   destination:

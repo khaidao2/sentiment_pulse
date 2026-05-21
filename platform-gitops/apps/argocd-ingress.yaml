@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: 'https://github.com/khaidao2/sentiment_pulse'
     targetRevision: HEAD
-    path: manifests
+    path: platform-gitops/manifests
     directory:
       include: 'argocd-ingress.yaml'
   destination:

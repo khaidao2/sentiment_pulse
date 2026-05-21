@@ -13,7 +13,7 @@ spec:
       targetRevision: 15.1.4
       helm:
         valueFiles:
-          - $values/helm-values/keycloak-values.yaml
+          - $values/platform-gitops/helm-values/keycloak-values.yaml
     - repoURL: 'https://github.com/khaidao2/sentiment_pulse' # Thay bằng URL git của bạn
       targetRevision: HEAD
       ref: values
