@@ -29,10 +29,14 @@ webserver:
   resources:
     requests:
       cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "500m"
       memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  startupProbe:
+    enabled: true
+    failureThreshold: 30 # Tăng thời gian chờ khởi động lên tối đa 5 phút (30 * 10s)
+    periodSeconds: 10
   webserverConfig: |
     from flask_appbuilder.security.manager import AUTH_REMOTE_USER
     # Tích hợp xác thực từ Header của oauth2-proxy
