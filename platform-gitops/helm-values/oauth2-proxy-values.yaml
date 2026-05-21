@@ -30,3 +30,8 @@ ingress:
   path: /
   hosts:
     - airflow.local
+
+hostAliases:
+  - ip: "10.43.79.154"
+    hostnames:
+      - "auth.local"
