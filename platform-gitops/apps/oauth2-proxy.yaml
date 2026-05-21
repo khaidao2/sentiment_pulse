@@ -13,7 +13,7 @@ spec:
       targetRevision: 7.7.2
       helm:
         valueFiles:
-          - $values/helm-values/oauth2-proxy-values.yaml
+          - $values/platform-gitops/helm-values/oauth2-proxy-values.yaml
     - repoURL: 'https://github.com/khaidao2/sentiment_pulse' 
       targetRevision: HEAD
       ref: values

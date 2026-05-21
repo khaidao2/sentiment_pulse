@@ -12,6 +12,7 @@ spec:
       chart: airflow
       targetRevision: 1.13.0
       helm:
+        skipSchemaValidation: true
         valueFiles:
           - $values/platform-gitops/helm-values/airflow-values.yaml
     - repoURL: 'https://github.com/khaidao2/sentiment_pulse'
