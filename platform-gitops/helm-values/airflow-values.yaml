@@ -86,11 +86,11 @@ scheduler:
     enabled: false
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 500m
+      memory: 512Mi
 
 # ── API Server (Airflow 3.x UI + REST API) ────────────────────────────────────
 apiServer:
@@ -100,11 +100,11 @@ apiServer:
     enabled: false
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 100m
+      memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 500m
+      memory: 512Mi
   env:
     - name: AIRFLOW__API_SERVER__WORKERS
       value: "4"
@@ -136,11 +136,11 @@ dagProcessor:
     enabled: false
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
 
 # ── Triggerer ─────────────────────────────────────────────────────────────────
 triggerer:
@@ -149,11 +149,11 @@ triggerer:
     enabled: false
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 100m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 250m
+      memory: 256Mi
 
 # ── Database (external Postgres) ──────────────────────────────────────────────
 postgresql:
