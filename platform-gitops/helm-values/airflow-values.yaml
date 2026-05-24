@@ -65,10 +65,10 @@ webserver:
         "remote_app": {
           "client_id": "airflow",
           "client_secret": open("/opt/airflow/sso/clientSecret").read().strip(),
-          "api_base_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect",
-          "access_token_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/token",
-          "authorize_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/auth",
-          "jwks_uri": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/certs",
+          "api_base_url": "http://auth.local/realms/data-platform/protocol/openid-connect",
+          "access_token_url": "http://auth.local/realms/data-platform/protocol/openid-connect/token",
+          "authorize_url": "http://auth.local/realms/data-platform/protocol/openid-connect/auth",
+          "jwks_uri": "http://auth.local/realms/data-platform/protocol/openid-connect/certs",
           "client_kwargs": {"scope": "openid email profile"},
         },
       }
@@ -162,9 +162,9 @@ postgresql:
 data:
   metadataConnection:
     user: airflow
-    pass: airflow
+    pass: airflowpassword
     protocol: postgresql
-    host: postgres-rw.platform.svc.cluster.local
+    host: postgres-postgresql.database.svc.cluster.local
     port: 5432
     db: airflow
 
@@ -204,7 +204,7 @@ dags:
     enabled: false
   gitSync:
     enabled: true
-    repo: https://gitlab.com/ba-ai-lab/data-platform/data-dags.git
+    repo: https://github.com/khaidao2/sentiment_pulse.git
     branch: main
     rev: HEAD
     depth: 1
@@ -231,11 +231,11 @@ ingress:
     enabled: true
     ingressClassName: traefik
     annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.entrypoints: web
     hosts:
-      - name: "airflow.ba-ai-lab.com"
+      - name: "airflow.local"
     tls:
-      enabled: true
+      enabled: false
 
 # ── Airflow Configuration ─────────────────────────────────────────────────────
 config:
