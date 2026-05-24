@@ -13,6 +13,11 @@ postgresql:
   image:
     repository: bitnamilegacy/postgresql
   enabled: true # Keycloak sử dụng DB của chính nó cho đơn giản, tự cô lập
+  auth:
+    database: bitnami_keycloak
+    username: bn_keycloak
+    password: DjDN3dzzvq
+    postgresPassword: CsxYT9n2L9
   primary:
     persistence:
       enabled: true
