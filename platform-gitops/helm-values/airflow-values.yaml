@@ -1,83 +1,264 @@
-# Apache Airflow Helm Values - Optimized for 8GB Local VM
-executor: "LocalExecutor"
+# Apache Airflow 3.1.8 — KubernetesExecutor for BA-AI Lab
+# Official Helm chart 1.20.0
 
-# Disable components to save memory
-redis:
-  enabled: false
-flower:
-  enabled: false
-pgbouncer:
-  enabled: false
+images:
+  airflow:
+    repository: apache/airflow
+    tag: "3.1.8"
+    pullPolicy: IfNotPresent
 
-# Database configuration
-data:
-  metadataConnection:
-    # URL connection: postgresql://username:password@host:port/database
-    # Trỏ trực tiếp sang DB deployed bởi chart postgres ở namespace database
-    user: "airflow"
-    pass: "airflowpassword"
-    host: "postgres-postgresql.database.svc.cluster.local"
-    port: 5432
-    db: "airflow"
+# ── Executor ──────────────────────────────────────────────────────────────────
+executor: KubernetesExecutor
 
-postgresql:
-  enabled: false # Không dùng postgres đi kèm của chart Airflow, dùng external postgres ở namespace database
+rbac:
+  create: true
 
-# Webserver configuration
+# Extra Environment (applied globally to webserver, scheduler, triggerer)
+extraEnv: |
+  - name: AIRFLOW_CONN_AWS_DEFAULT
+    valueFrom:
+      secretKeyRef:
+        name: airflow-s3-credentials
+        key: connectionUri
+  - name: AIRFLOW_CONN_DATALAKE_MINIO
+    valueFrom:
+      secretKeyRef:
+        name: airflow-s3-credentials
+        key: connectionUri
+  - name: AIRFLOW_CONN_PLAYWRIGHT_GIT
+    valueFrom:
+      secretKeyRef:
+        name: airflow-git-credentials
+        key: connectionUri
+  - name: AIRFLOW__SECRETS__BACKEND
+    value: "airflow.providers.cncf.kubernetes.secrets.kubernetes_secrets_backend.KubernetesSecretsBackend"
+  - name: AIRFLOW__KUBERNETES_SECRETS_BACKEND__CONNECTIONS_PREFIX
+    value: "airflow-connections"
+  - name: AIRFLOW__KUBERNETES_SECRETS_BACKEND__VARIABLES_PREFIX
+    value: "airflow-variables"
+  - name: AIRFLOW__KUBERNETES_SECRETS_BACKEND__NAMESPACES
+    value: "airflow"
+  - name: PYTHONPATH
+    value: "/opt/airflow/dags/repo"
+
+# ── Secrets from Vault + VSO ──────────────────────────────────────────────────
+fernetKeySecretName: airflow-fernet-key
+webserverSecretKeySecretName: airflow-webserver-secret
+
+# ── Webserver (pod disabled in Airflow 3.x — but webserverConfig still creates
+#    the ConfigMap that apiServer mounts for FabAuthManager/OAuth) ─────────────
 webserver:
-  replicas: 1
-  resources:
-    requests:
-      cpu: "100m"
-      memory: "512Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1024Mi"
-  startupProbe:
-    enabled: true
-    failureThreshold: 30 # Tăng thời gian chờ khởi động lên tối đa 5 phút (30 * 10s)
-    periodSeconds: 10
+  enabled: false
   webserverConfig: |
-    from flask_appbuilder.security.manager import AUTH_REMOTE_USER
-    # Tích hợp xác thực từ Header của oauth2-proxy
-    AUTH_TYPE = AUTH_REMOTE_USER
-    AUTH_ROLES_SYNC_AT_LOGIN = True
-    AUTH_USER_REGISTRATION = True
-    AUTH_USER_REGISTRATION_ROLE = "Admin"
+    from flask_appbuilder.security.manager import AUTH_OAUTH
 
-# Scheduler configuration
+    AUTH_TYPE = AUTH_OAUTH
+    AUTH_USER_REGISTRATION = True
+    AUTH_USER_REGISTRATION_ROLE = "Viewer"
+    AUTH_ROLES_SYNC_AT_LOGIN = False
+
+    OAUTH_PROVIDERS = [
+      {
+        "name": "keycloak",
+        "icon": "fa-key",
+        "token_key": "access_token",
+        "remote_app": {
+          "client_id": "airflow",
+          "client_secret": open("/opt/airflow/sso/clientSecret").read().strip(),
+          "api_base_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect",
+          "access_token_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/token",
+          "authorize_url": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/auth",
+          "jwks_uri": "https://auth.ba-ai-lab.com/realms/master/protocol/openid-connect/certs",
+          "client_kwargs": {"scope": "openid email profile"},
+        },
+      }
+    ]
+
+    AUTH_ROLES_MAPPING = {
+      "airflow_admin": ["Admin"],
+      "airflow_viewer": ["Viewer"],
+    }
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
 scheduler:
   replicas: 1
+  waitForMigrations:
+    enabled: false
   resources:
     requests:
-      cpu: "200m"
-      memory: "512Mi"
+      cpu: 500m
+      memory: 1Gi
     limits:
-      cpu: "1000m"
-      memory: "1024Mi"
+      cpu: 1000m
+      memory: 2Gi
 
-# Disable worker pods since we are using LocalExecutor
-workers:
-  enabled: false
+# ── API Server (Airflow 3.x UI + REST API) ────────────────────────────────────
+apiServer:
+  enabled: true
+  replicas: 1
+  waitForMigrations:
+    enabled: false
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    - name: AIRFLOW__API_SERVER__WORKERS
+      value: "4"
 
-# Triggerer configuration (optional, reduce resource)
+  extraVolumes:
+    - name: sso-secret
+      secret:
+        secretName: airflow-sso-credentials
+    - name: webserver-config
+      configMap:
+        name: airflow-webserver-config
+
+  extraVolumeMounts:
+    - name: sso-secret
+      mountPath: /opt/airflow/sso
+      readOnly: true
+    - name: webserver-config
+      mountPath: /opt/airflow/webserver_config.py
+      subPath: webserver_config.py
+      readOnly: true
+
+# ── DAG Processor (Airflow 3.x) ───────────────────────────────────────────────
+# Required in Airflow 3.x — standalone_dag_processor=True by default,
+# scheduler no longer parses DAG files itself.
+dagProcessor:
+  enabled: true
+  replicas: 1
+  waitForMigrations:
+    enabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ── Triggerer ─────────────────────────────────────────────────────────────────
 triggerer:
+  replicas: 1
+  waitForMigrations:
+    enabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ── Database (external Postgres) ──────────────────────────────────────────────
+postgresql:
   enabled: false
 
-# Mount local DAGs folder or volume
+data:
+  metadataConnection:
+    user: airflow
+    pass: airflow
+    protocol: postgresql
+    host: postgres-rw.platform.svc.cluster.local
+    port: 5432
+    db: airflow
+
+# ── Redis, Flower, Workers ────────────────────────────────────────────────────
+redis:
+  enabled: false
+
+flower:
+  enabled: false
+
+workers:
+  replicas: 0
+  # KubernetesExecutor task pods are rendered from the chart's default
+  # pod-template-file.kubernetes-helm-yaml, which pulls affinity and
+  # tolerations from workers.{affinity,tolerations}. Soft preference for
+  # role=data-processing (ws-05/06/07) keeps batch/DAG workload off the
+  # CP node and off z8 (which is reserved for AI workloads), but still
+  # allows fallback to CP if all workstations are full.
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: role
+                operator: In
+                values: [data-processing]
+  tolerations:
+    - key: role
+      operator: Equal
+      value: infra
+      effect: PreferNoSchedule
+
+# ── DAGs via git-sync ─────────────────────────────────────────────────────────
 dags:
   persistence:
+    enabled: false
+  gitSync:
     enabled: true
-    size: 2Gi
-    accessMode: ReadWriteOnce
-    storageClassName: local-path # Storage class mặc định của K3s
+    repo: https://gitlab.com/ba-ai-lab/data-platform/data-dags.git
+    branch: main
+    rev: HEAD
+    depth: 1
+    wait: 10
+    subPath: "dags"
+    credentialsSecret: airflow-git-credentials
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
 
-# Tương thích với ArgoCD: Tắt Helm Hooks cho các Job để ArgoCD tự quản lý vòng đời
-createUserJob:
+# ── Logs (remote to S3 only) ──────────────────────────────────────────────────
+logs:
+  persistence:
+    enabled: false
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  web:
+    enabled: false
+  apiServer:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    hosts:
+      - name: "airflow.ba-ai-lab.com"
+    tls:
+      enabled: true
+
+# ── Airflow Configuration ─────────────────────────────────────────────────────
+config:
+  core:
+    load_examples: "False"
+    auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  webserver:
+    expose_config: "True"
+  logging:
+    remote_logging: "True"
+    remote_log_conn_id: "aws_default"
+    remote_base_log_folder: "s3://airflow/logs"
+  kubernetes_executor:
+    delete_worker_pods: "True"
+    delete_worker_pods_on_failure: "False"
+
+# ── Jobs ──────────────────────────────────────────────────────────────────────
+migrateDatabaseJob:
+  enabled: false
   useHelmHooks: false
   applyCustomEnv: false
 
-migrateDatabaseJob:
-  enabled: true
+createUserJob:
+  enabled: false
   useHelmHooks: false
   applyCustomEnv: false

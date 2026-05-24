@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: 'https://airflow.apache.org'
       chart: airflow
-      targetRevision: 1.16.0
+      targetRevision: 1.20.0
       helm:
         skipSchemaValidation: true
         valueFiles:
