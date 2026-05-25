@@ -29,6 +29,10 @@ spec:
           value: "256Mi"
         - name: resources.requests.cpu
           value: "100m"
+        - name: livenessProbe.initialDelaySeconds
+          value: "120"
+        - name: readinessProbe.initialDelaySeconds
+          value: "120"
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: kafka
