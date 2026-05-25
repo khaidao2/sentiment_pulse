@@ -84,13 +84,17 @@ scheduler:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 30
+    failureThreshold: 30
+    periodSeconds: 10
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 256Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 2000m
+      memory: 1024Mi
 
 # ── API Server (Airflow 3.x UI + REST API) ────────────────────────────────────
 apiServer:
@@ -98,13 +102,17 @@ apiServer:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 30
+    failureThreshold: 30
+    periodSeconds: 10
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 256Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 2000m
+      memory: 1024Mi
   env:
     - name: AIRFLOW__API_SERVER__WORKERS
       value: "4"
@@ -134,12 +142,16 @@ dagProcessor:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 30
+    failureThreshold: 30
+    periodSeconds: 10
   resources:
     requests:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 500m
+      cpu: 1000m
       memory: 512Mi
 
 # ── Triggerer ─────────────────────────────────────────────────────────────────
@@ -147,13 +159,17 @@ triggerer:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 30
+    failureThreshold: 30
+    periodSeconds: 10
   resources:
     requests:
       cpu: 100m
       memory: 128Mi
     limits:
-      cpu: 250m
-      memory: 256Mi
+      cpu: 1000m
+      memory: 512Mi
 
 # ── Database (external Postgres) ──────────────────────────────────────────────
 postgresql:
