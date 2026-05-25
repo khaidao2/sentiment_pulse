@@ -13,6 +13,8 @@ spec:
     targetRevision: 23.0.7
     helm:
       parameters:
+        - name: image.repository
+          value: "bitnamilegacy/kafka"
         - name: replicaCount
           value: "1"
         - name: zookeeper.enabled
