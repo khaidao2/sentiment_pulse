@@ -92,6 +92,10 @@ scheduler:
     timeoutSeconds: 180
     periodSeconds: 60
     failureThreshold: 10
+  hostAliases:
+    - ip: "192.168.1.17"
+      hostnames:
+        - "auth.local"
   resources:
     requests:
       cpu: 200m
@@ -118,6 +122,10 @@ apiServer:
     timeoutSeconds: 180
     periodSeconds: 60
     failureThreshold: 10
+  hostAliases:
+    - ip: "192.168.1.17"
+      hostnames:
+        - "auth.local"
   resources:
     requests:
       cpu: 200m
@@ -133,18 +141,18 @@ apiServer:
     - name: sso-secret
       secret:
         secretName: airflow-sso-credentials
-#    - name: webserver-config
-#      configMap:
-#        name: airflow-webserver-config
+    - name: webserver-config
+      configMap:
+        name: airflow-webserver-config
 
   extraVolumeMounts:
     - name: sso-secret
       mountPath: /opt/airflow/sso
       readOnly: true
-#    - name: webserver-config
-#      mountPath: /opt/airflow/webserver_config.py
-#      subPath: webserver_config.py
-#      readOnly: true
+    - name: webserver-config
+      mountPath: /opt/airflow/webserver_config.py
+      subPath: webserver_config.py
+      readOnly: true
 
 # ── DAG Processor (Airflow 3.x) ───────────────────────────────────────────────
 # Required in Airflow 3.x — standalone_dag_processor=True by default,
