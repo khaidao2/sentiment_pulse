@@ -94,15 +94,20 @@ scheduler:
 
 ---
 
-## ⚡ Các Tùy chỉnh Tối ưu hóa Hiệu năng (Performance Tuning)
+## 🎡 Cụm Kafka & Hệ sinh thái (Kafka Ecosystem)
 
-Để chạy ổn định trên môi trường máy ảo (VM) có tài nguyên CPU/RAM hạn chế:
+Hệ thống tích hợp một cụm Kafka tối giản cùng các công cụ quản trị và quản lý Schema Contract:
 
-1.  **Tăng Probe Timeout**: Do hệ thống khởi động Python và kết nối DB trên VM mất nhiều thời gian, toàn bộ Probe (`startupProbe`, `livenessProbe`) của Airflow được nâng lên **180 giây** nhằm tránh việc Kubernetes kill container quá sớm.
-2.  **Tối ưu Worker của API Server**:
-    *   Giảm số lượng API Server Workers xuống **`1`** (`AIRFLOW__API_SERVER__WORKERS: "1"`) để giảm lượng CPU khởi tạo ban đầu, bảo toàn tài nguyên cho Scheduler và DAG Processor.
-3.  **Tăng giới hạn Tài nguyên**:
-    *   Các pod `scheduler`, `apiServer`, `dagProcessor`, và `triggerer` đều được đặt giới hạn RAM ở mức tối thiểu **`1024Mi` (1Gi)** nhằm triệt tiêu lỗi `OOMKilled`.
+1. **Kafka (KRaft Mode)**:
+   - Triển khai bằng Bitnami Helm chart ở chế độ KRaft (không cần ZooKeeper) để tối ưu hóa tài nguyên RAM và CPU của máy ảo.
+   - Namespace: `kafka`
+   - Service: `kafka.kafka.svc.cluster.local:9092`
+2. **Kafka UI**:
+   - Giao diện web quản trị trực quan cho cụm Kafka để theo dõi Topic, Message, Consumer Group.
+   - Service: `kafka-ui.kafka.svc.cluster.local` (cổng 80)
+3. **Apicurio Registry (Schema Registry)**:
+   - Lưu trữ và quản lý các Schema Contract (Avro, JSON Schema). Sử dụng phiên bản in-memory siêu nhẹ.
+   - Service: `apicurio.kafka.svc.cluster.local` (cổng 80)
 
 ---
 

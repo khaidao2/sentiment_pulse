@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: 'https://charts.bitnami.com/bitnami'
+    chart: kafka
+    targetRevision: 23.0.7
+    helm:
+      parameters:
+        - name: replicaCount
+          value: "1"
+        - name: zookeeper.enabled
+          value: "false"
+        - name: kraft.enabled
+          value: "true"
+        - name: persistence.size
+          value: "2Gi"
+        - name: resources.limits.memory
+          value: "512Mi"
+        - name: resources.requests.memory
+          value: "256Mi"
+        - name: resources.requests.cpu
+          value: "100m"
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
