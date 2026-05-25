@@ -277,7 +277,7 @@ ingress:
 config:
   core:
     load_examples: "False"
-#    auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
   webserver:
     expose_config: "True"
   logging:
