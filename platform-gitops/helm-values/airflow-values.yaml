@@ -127,24 +127,24 @@ apiServer:
       memory: 1024Mi
   env:
     - name: AIRFLOW__API_SERVER__WORKERS
-      value: "4"
+      value: "1"
 
   extraVolumes:
     - name: sso-secret
       secret:
         secretName: airflow-sso-credentials
-    - name: webserver-config
-      configMap:
-        name: airflow-webserver-config
+#    - name: webserver-config
+#      configMap:
+#        name: airflow-webserver-config
 
   extraVolumeMounts:
     - name: sso-secret
       mountPath: /opt/airflow/sso
       readOnly: true
-    - name: webserver-config
-      mountPath: /opt/airflow/webserver_config.py
-      subPath: webserver_config.py
-      readOnly: true
+#    - name: webserver-config
+#      mountPath: /opt/airflow/webserver_config.py
+#      subPath: webserver_config.py
+#      readOnly: true
 
 # ── DAG Processor (Airflow 3.x) ───────────────────────────────────────────────
 # Required in Airflow 3.x — standalone_dag_processor=True by default,
@@ -277,7 +277,7 @@ ingress:
 config:
   core:
     load_examples: "False"
-    auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+#    auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
   webserver:
     expose_config: "True"
   logging:
