@@ -85,23 +85,13 @@ scheduler:
   waitForMigrations:
     enabled: false
   startupProbe:
-    exec:
-      command:
-        - sh
-        - -c
-        - grep -q "airflow scheduler" /proc/[0-9]*/cmdline
-    timeoutSeconds: 5
+    timeoutSeconds: 180
     failureThreshold: 30
-    periodSeconds: 10
+    periodSeconds: 20
   livenessProbe:
-    exec:
-      command:
-        - sh
-        - -c
-        - grep -q "airflow scheduler" /proc/[0-9]*/cmdline
-    timeoutSeconds: 5
-    periodSeconds: 30
-    failureThreshold: 5
+    timeoutSeconds: 180
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 200m
@@ -116,6 +106,18 @@ apiServer:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 180
+    failureThreshold: 30
+    periodSeconds: 20
+  livenessProbe:
+    timeoutSeconds: 180
+    periodSeconds: 60
+    failureThreshold: 10
+  readinessProbe:
+    timeoutSeconds: 180
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 200m
@@ -152,15 +154,14 @@ dagProcessor:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 180
+    failureThreshold: 30
+    periodSeconds: 20
   livenessProbe:
-    exec:
-      command:
-        - sh
-        - -c
-        - grep -q "airflow dag-processor" /proc/[0-9]*/cmdline
-    timeoutSeconds: 5
-    periodSeconds: 30
-    failureThreshold: 5
+    timeoutSeconds: 180
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 100m
@@ -174,15 +175,14 @@ triggerer:
   replicas: 1
   waitForMigrations:
     enabled: false
+  startupProbe:
+    timeoutSeconds: 180
+    failureThreshold: 30
+    periodSeconds: 20
   livenessProbe:
-    exec:
-      command:
-        - sh
-        - -c
-        - grep -q "airflow triggerer" /proc/[0-9]*/cmdline
-    timeoutSeconds: 5
-    periodSeconds: 30
-    failureThreshold: 5
+    timeoutSeconds: 180
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 100m
