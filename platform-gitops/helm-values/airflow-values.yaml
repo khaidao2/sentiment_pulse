@@ -85,9 +85,13 @@ scheduler:
   waitForMigrations:
     enabled: false
   startupProbe:
-    timeoutSeconds: 30
+    timeoutSeconds: 120
     failureThreshold: 30
-    periodSeconds: 10
+    periodSeconds: 15
+  livenessProbe:
+    timeoutSeconds: 120
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 200m
@@ -103,9 +107,17 @@ apiServer:
   waitForMigrations:
     enabled: false
   startupProbe:
-    timeoutSeconds: 30
+    timeoutSeconds: 120
     failureThreshold: 30
-    periodSeconds: 10
+    periodSeconds: 15
+  livenessProbe:
+    timeoutSeconds: 120
+    periodSeconds: 60
+    failureThreshold: 10
+  readinessProbe:
+    timeoutSeconds: 120
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 200m
@@ -143,9 +155,13 @@ dagProcessor:
   waitForMigrations:
     enabled: false
   startupProbe:
-    timeoutSeconds: 30
+    timeoutSeconds: 120
     failureThreshold: 30
-    periodSeconds: 10
+    periodSeconds: 15
+  livenessProbe:
+    timeoutSeconds: 120
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 100m
@@ -160,9 +176,13 @@ triggerer:
   waitForMigrations:
     enabled: false
   startupProbe:
-    timeoutSeconds: 30
+    timeoutSeconds: 120
     failureThreshold: 30
-    periodSeconds: 10
+    periodSeconds: 15
+  livenessProbe:
+    timeoutSeconds: 120
+    periodSeconds: 60
+    failureThreshold: 10
   resources:
     requests:
       cpu: 100m
