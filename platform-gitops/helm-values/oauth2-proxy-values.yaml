@@ -32,6 +32,6 @@ ingress:
     - airflow.local
 
 hostAliases:
-  - ip: "10.43.79.154"
+  - ip: "10.43.143.179"
     hostnames:
       - "auth.local"

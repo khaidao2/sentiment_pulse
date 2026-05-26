@@ -93,7 +93,7 @@ scheduler:
     periodSeconds: 60
     failureThreshold: 10
   hostAliases:
-    - ip: "192.168.1.17"
+    - ip: "10.43.143.179"
       hostnames:
         - "auth.local"
   resources:
@@ -123,7 +123,7 @@ apiServer:
     periodSeconds: 60
     failureThreshold: 10
   hostAliases:
-    - ip: "192.168.1.17"
+    - ip: "10.43.143.179"
       hostnames:
         - "auth.local"
   resources:
