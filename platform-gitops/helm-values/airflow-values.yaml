@@ -272,7 +272,7 @@ ingress:
   web:
     enabled: false
   apiServer:
-    enabled: false
+    enabled: true
     ingressClassName: traefik
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: web
