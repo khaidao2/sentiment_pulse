@@ -13,6 +13,8 @@ hostAliases:
       - "auth.local"
 
 env:
+  GF_SERVER_DOMAIN: "grafana.local"
+  GF_SERVER_ROOT_URL: "http://grafana.local"
   GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
   GF_AUTH_GENERIC_OAUTH_NAME: "Keycloak"
   GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "grafana"
