@@ -9,7 +9,7 @@ config:
     oidc_issuer_url = "http://auth.local/realms/data-platform"
     redirect_url = "http://airflow.local/oauth2/callback"
     upstreams = [
-        "http://airflow-webserver.airflow.svc.cluster.local:8080"
+        "http://airflow-api-server.airflow.svc.cluster.local:8080"
     ]
     email_domains = ["*"]
     set_xauthrequest = true
