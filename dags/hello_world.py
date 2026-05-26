@@ -15,7 +15,7 @@ with DAG(
     'hello_world_dag',
     default_args=default_args,
     description='A simple hello world DAG',
-    schedule_interval=timedelta(days=1),
+    schedule=timedelta(days=1),
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=['example'],
