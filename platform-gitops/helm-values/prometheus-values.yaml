@@ -1,4 +1,5 @@
 # Prometheus Helm values for Local K3s (sentiment_pulse)
+
 server:
   resources:
     limits:
@@ -16,7 +17,7 @@ alertmanager:
 pushgateway:
   enabled: false
 
-# Cấu hình sub-chart kube-state-metrics
+# kube-state-metrics
 kube-state-metrics:
   enabled: true
   resources:
@@ -26,40 +27,46 @@ kube-state-metrics:
     requests:
       cpu: 50m
       memory: 64Mi
-  # Tăng timeout cho probe trên cluster tài nguyên thấp
+
   customLivenessProbe:
     httpGet:
       path: /healthz
       port: 8080
-      scheme: HTTP
     initialDelaySeconds: 30
     periodSeconds: 30
     timeoutSeconds: 10
     failureThreshold: 5
+
   customReadinessProbe:
     httpGet:
       path: /
       port: 8080
-      scheme: HTTP
     initialDelaySeconds: 20
     periodSeconds: 15
     timeoutSeconds: 10
     failureThreshold: 5
 
-# Cấu hình sub-chart prometheus-node-exporter
+# node-exporter (IMPORTANT FIX)
 prometheus-node-exporter:
   enabled: true
+
+  # giữ hostNetwork vì k3s local OK
   hostNetwork: true
   hostPID: true
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 10
-  extraArgs:
-    - --web.listen-address=0.0.0.0:9101
+
+
   service:
     port: 9101
     targetPort: 9101
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
   livenessProbe:
     httpGet:
       path: /
@@ -68,6 +75,7 @@ prometheus-node-exporter:
     periodSeconds: 30
     timeoutSeconds: 10
     failureThreshold: 5
+
   readinessProbe:
     httpGet:
       path: /
@@ -76,7 +84,12 @@ prometheus-node-exporter:
     periodSeconds: 15
     timeoutSeconds: 10
     failureThreshold: 3
-  # Bỏ qua node NotReady (Tailscale cũ)
+
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10
+
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
