@@ -19,18 +19,42 @@ pushgateway:
 # Cấu hình sub-chart kube-state-metrics
 kube-state-metrics:
   enabled: true
-  livenessProbe:
-    enabled: false # Tắt tạm thời để gỡ lỗi liveness
-  readinessProbe:
-    enabled: false # Tắt tạm thời để gỡ lỗi readiness
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  # Tăng timeout cho probe trên cluster tài nguyên thấp
+  customLivenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+      scheme: HTTP
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+  customReadinessProbe:
+    httpGet:
+      path: /
+      port: 8080
+      scheme: HTTP
+    initialDelaySeconds: 20
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
 
 # Cấu hình sub-chart prometheus-node-exporter
 prometheus-node-exporter:
   enabled: true
+  hostNetwork: true
+  hostPID: true
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 10 # Gỡ lỗi nghẽn cập nhật khi có node offline
+      maxUnavailable: 10
   extraArgs:
     - --web.listen-address=0.0.0.0:9101
   service:
@@ -38,9 +62,25 @@ prometheus-node-exporter:
     targetPort: 9101
   livenessProbe:
     httpGet:
-      host: 127.0.0.1
+      path: /
       port: 9101
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
   readinessProbe:
     httpGet:
-      host: 127.0.0.1
+      path: /
       port: 9101
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+  # Bỏ qua node NotReady (Tailscale cũ)
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node.kubernetes.io/unreachable
+                operator: DoesNotExist
