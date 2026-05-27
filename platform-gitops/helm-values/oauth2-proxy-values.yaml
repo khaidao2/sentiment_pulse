@@ -6,7 +6,7 @@ config:
   cookieSecret: "ZDFhMkIzYzRkNURlRmdoSWpLbU5vUHFSc1R1VndYeVo=" 
   configFile: |-
     provider = "oidc"
-    oidc_issuer_url = "http://auth.sentpul.click/realms/data-platform"
+    oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"
     redirect_url = "https://airflow.sentpul.click/oauth2/callback"
     upstreams = [
         "http://airflow-api-server.airflow.svc.cluster.local:8080"

@@ -3,6 +3,9 @@ replicaCount: 1
 
 proxy: edge
 
+extraEnvVars:
+  - name: KC_PROXY
+    value: "edge"
 
 auth:
   adminUser: admin
