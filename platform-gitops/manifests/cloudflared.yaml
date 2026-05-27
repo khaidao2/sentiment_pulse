@@ -11,7 +11,9 @@ data:
       - hostname: airflow.sentpul.click
         service: http://airflow-api-server.airflow:8080
       - hostname: argocd.sentpul.click
-        service: http://argocd-server.argocd:80
+        service: https://argocd-server.argocd:443
+        originRequest:
+          noTLSVerify: true
       - hostname: kafka.sentpul.click
         service: http://kafka-ui.kafka:80
       - hostname: auth.sentpul.click
