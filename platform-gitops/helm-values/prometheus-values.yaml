@@ -1,0 +1,23 @@
+# Prometheus Helm values for Local K3s (sentiment_pulse)
+server:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1024Mi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  persistentVolume:
+    size: 5Gi
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+alertmanager:
+  enabled: false
+
+pushgateway:
+  enabled: false
