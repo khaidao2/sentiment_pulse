@@ -30,10 +30,15 @@ kube-state-metrics:
 prometheus-node-exporter:
   enabled: true
   extraArgs:
-    - --web.listen-address=0.0.0.0:9100
+    - --web.listen-address=0.0.0.0:9101 # Đổi cổng lắng nghe sang 9101
+  service:
+    port: 9101
+    targetPort: 9101
   livenessProbe:
     httpGet:
       host: 127.0.0.1
+      port: 9101
   readinessProbe:
     httpGet:
       host: 127.0.0.1
+      port: 9101
