@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    tunnel: c3fe5ab2-42d6-466c-9b0e-17ff88b14de6
+    credentials-file: /etc/cloudflared/creds/credentials.json
+    ingress:
+      - hostname: airflow.sentpul.click
+        service: http://airflow-api-server.airflow:8080
+      - hostname: argocd.sentpul.click
+        service: http://argocd-server.argocd:80
+      - hostname: kafka.sentpul.click
+        service: http://kafka-ui.kafka:80
+      - hostname: auth.sentpul.click
+        service: http://keycloak.keycloak:80
+      - hostname: grafana.sentpul.click
+        service: http://grafana.airflow:80
+      - service: http_status:404
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: kube-system
+  labels:
+    app: cloudflared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        args:
+        - tunnel
+        - --config
+        - /etc/cloudflared/config/config.yaml
+        - run
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cloudflared/config
+          readOnly: true
+        - name: creds
+          mountPath: /etc/cloudflared/creds
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: cloudflared-config
+      - name: creds
+        secret:
+          secretName: cloudflared-creds
