@@ -1,0 +1,80 @@
+{
+  "id": "data-platform",
+  "realm": "data-platform",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "airflow_admin",
+        "description": "Admin role for Apache Airflow"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "airflow",
+      "name": "Airflow FAB Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I",
+      "redirectUris": [
+        "https://airflow.sentpul.click/*"
+      ],
+      "webOrigins": [
+        "https://airflow.sentpul.click"
+      ],
+      "standardFlowEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "airflow-client",
+      "name": "Airflow OAuth2 Proxy Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I",
+      "redirectUris": [
+        "https://airflow.sentpul.click/*"
+      ],
+      "webOrigins": [
+        "https://airflow.sentpul.click"
+      ],
+      "standardFlowEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "minio",
+      "name": "MinIO Console Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "minio-keycloak-client-secret-key-1234",
+      "redirectUris": [
+        "https://minio.sentpul.click/*",
+        "https://minio.sentpul.click/oauth_callback"
+      ],
+      "webOrigins": [
+        "https://minio.sentpul.click"
+      ],
+      "standardFlowEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "minio-policy",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "policy",
+            "claim.value": "consoleAdmin",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

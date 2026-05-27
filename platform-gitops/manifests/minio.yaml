@@ -47,6 +47,18 @@ spec:
               value: "minioadmin"
             - name: MINIO_ROOT_PASSWORD
               value: "minioadminpassword"
+            - name: MINIO_IDENTITY_OPENID_CONFIG_URL
+              value: "http://keycloak.keycloak:80/realms/data-platform/.well-known/openid-configuration"
+            - name: MINIO_IDENTITY_OPENID_CLIENT_ID
+              value: "minio"
+            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
+              value: "minio-keycloak-client-secret-key-1234"
+            - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
+              value: "https://minio.sentpul.click/oauth_callback"
+            - name: MINIO_IDENTITY_OPENID_SCOPES
+              value: "openid,profile,email"
+            - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
+              value: "policy"
           resources:
             requests:
               cpu: 100m
