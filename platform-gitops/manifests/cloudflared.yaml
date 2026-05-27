@@ -20,6 +20,12 @@ data:
         service: http://keycloak.keycloak:80
       - hostname: grafana.sentpul.click
         service: http://grafana.airflow:80
+      - hostname: minio.sentpul.click
+        service: http://minio.database:9001
+      - hostname: minio-api.sentpul.click
+        service: http://minio.database:9000
+      - hostname: clickhouse.sentpul.click
+        service: http://clickhouse.database:8123
       - service: http_status:404
 ---
 apiVersion: apps/v1
