@@ -8,7 +8,7 @@ metadata:
     traefik.ingress.kubernetes.io/service.serversscheme: https
 spec:
   rules:
-    - host: argocd.local
+    - host: argocd.sentpul.click
       http:
         paths:
           - path: /

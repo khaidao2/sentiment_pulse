@@ -65,10 +65,10 @@ webserver:
         "remote_app": {
           "client_id": "airflow",
           "client_secret": open("/opt/airflow/sso/clientSecret").read().strip(),
-          "api_base_url": "http://auth.local/realms/data-platform/protocol/openid-connect",
-          "access_token_url": "http://auth.local/realms/data-platform/protocol/openid-connect/token",
-          "authorize_url": "http://auth.local/realms/data-platform/protocol/openid-connect/auth",
-          "jwks_uri": "http://auth.local/realms/data-platform/protocol/openid-connect/certs",
+          "api_base_url": "http://auth.sentpul.click/realms/data-platform/protocol/openid-connect",
+          "access_token_url": "http://auth.sentpul.click/realms/data-platform/protocol/openid-connect/token",
+          "authorize_url": "http://auth.sentpul.click/realms/data-platform/protocol/openid-connect/auth",
+          "jwks_uri": "http://auth.sentpul.click/realms/data-platform/protocol/openid-connect/certs",
           "client_kwargs": {"scope": "openid email profile"},
         },
       }
@@ -95,7 +95,7 @@ scheduler:
   hostAliases:
     - ip: "100.105.252.55"
       hostnames:
-        - "auth.local"
+        - "auth.sentpul.click"
   resources:
     requests:
       cpu: 200m
@@ -125,7 +125,7 @@ apiServer:
   hostAliases:
     - ip: "100.105.252.55"
       hostnames:
-        - "auth.local"
+        - "auth.sentpul.click"
   resources:
     requests:
       cpu: 200m
@@ -277,7 +277,7 @@ ingress:
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: web
     hosts:
-      - name: "airflow.local"
+      - name: "airflow.sentpul.click"
     tls:
       enabled: false
 

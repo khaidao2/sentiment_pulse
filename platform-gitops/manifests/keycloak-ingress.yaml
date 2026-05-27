@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: auth.local
+    - host: auth.sentpul.click
       http:
         paths:
           - path: /

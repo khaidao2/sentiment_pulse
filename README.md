@@ -29,8 +29,8 @@ graph TD
 
     subgraph Ingress Traffic
         Traefik[Traefik LoadBalancer: 192.168.1.17]
-        Traefik -- "auth.local" --> KC
-        Traefik -- "airflow.local" --> API
+        Traefik -- "auth.sentpul.click" --> KC
+        Traefik -- "airflow.sentpul.click" --> API
     end
 
     API -- "Giải phân giải DNS nội bộ qua hostAliases" --> Traefik
@@ -73,7 +73,7 @@ Argo CD sẽ tự động quét thư mục `apps/`, tạo các namespace cần t
 Airflow 3.x sử dụng **FastAPI API Server** làm cổng giao tiếp chính. Hệ thống được bảo mật bằng **FAB Auth Manager (Keycloak OIDC Provider)**.
 
 ### Giải pháp Phân giải DNS nội bộ (Internal DNS Resolution)
-Do Keycloak sử dụng tên miền bên ngoài là `auth.local`, các container bên trong cluster (như `apiServer` và `scheduler`) khi khởi chạy sẽ gọi đến đầu cuối `http://auth.local/realms/...` để lấy khóa công khai (JWKs) nhằm xác thực JWT Token. 
+Do Keycloak sử dụng tên miền bên ngoài là `auth.sentpul.click`, các container bên trong cluster (như `apiServer` và `scheduler`) khi khởi chạy sẽ gọi đến đầu cuối `http://auth.sentpul.click/realms/...` để lấy khóa công khai (JWKs) nhằm xác thực JWT Token. 
 
 Vì DNS nội bộ (`kube-dns`) không tự phân giải được tên miền này, chúng ta sử dụng cấu hình **`hostAliases`** trỏ trực tiếp về IP của Ingress Controller:
 
@@ -83,13 +83,13 @@ apiServer:
   hostAliases:
     - ip: "192.168.1.17"  # Traefik LoadBalancer IP
       hostnames:
-        - "auth.local"
+        - "auth.sentpul.click"
 
 scheduler:
   hostAliases:
     - ip: "192.168.1.17"
       hostnames:
-        - "auth.local"
+        - "auth.sentpul.click"
 ```
 
 ---

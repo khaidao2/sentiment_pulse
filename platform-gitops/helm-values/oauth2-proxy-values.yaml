@@ -6,8 +6,8 @@ config:
   cookieSecret: "ZDFhMkIzYzRkNURlRmdoSWpLbU5vUHFSc1R1VndYeVo=" 
   configFile: |-
     provider = "oidc"
-    oidc_issuer_url = "http://auth.local/realms/data-platform"
-    redirect_url = "http://airflow.local/oauth2/callback"
+    oidc_issuer_url = "http://auth.sentpul.click/realms/data-platform"
+    redirect_url = "https://airflow.sentpul.click/oauth2/callback"
     upstreams = [
         "http://airflow-api-server.airflow.svc.cluster.local:8080"
     ]
@@ -29,9 +29,9 @@ ingress:
   className: traefik
   path: /
   hosts:
-    - airflow.local
+    - airflow.sentpul.click
 
 hostAliases:
   - ip: "100.105.252.55"
     hostnames:
-      - "auth.local"
+      - "auth.sentpul.click"

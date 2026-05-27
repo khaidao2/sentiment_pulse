@@ -53,7 +53,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: kafka-ui.local
+    - host: kafka-ui.sentpul.click
       http:
         paths:
           - path: /
