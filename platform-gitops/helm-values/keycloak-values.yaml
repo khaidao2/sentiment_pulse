@@ -1,6 +1,9 @@
 # Keycloak Helm values for Local K3s
 replicaCount: 1
 
+proxy: edge
+
+
 auth:
   adminUser: admin
   adminPassword: adminpassword
