@@ -30,8 +30,3 @@ ingress:
   path: /
   hosts:
     - airflow.sentpul.click
-
-hostAliases:
-  - ip: "100.105.252.55"
-    hostnames:
-      - "auth.sentpul.click"
