@@ -20,17 +20,19 @@ pushgateway:
 kube-state-metrics:
   enabled: true
   livenessProbe:
-    httpGet:
-      host: 127.0.0.1
+    enabled: false # Tắt tạm thời để gỡ lỗi liveness
   readinessProbe:
-    httpGet:
-      host: 127.0.0.1
+    enabled: false # Tắt tạm thời để gỡ lỗi readiness
 
 # Cấu hình sub-chart prometheus-node-exporter
 prometheus-node-exporter:
   enabled: true
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10 # Gỡ lỗi nghẽn cập nhật khi có node offline
   extraArgs:
-    - --web.listen-address=0.0.0.0:9101 # Đổi cổng lắng nghe sang 9101
+    - --web.listen-address=0.0.0.0:9101
   service:
     port: 9101
     targetPort: 9101
