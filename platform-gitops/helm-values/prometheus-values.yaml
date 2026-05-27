@@ -10,14 +10,30 @@ server:
   persistentVolume:
     size: 5Gi
 
-nodeExporter:
-  enabled: true
-
-kubeStateMetrics:
-  enabled: true
-
 alertmanager:
   enabled: false
 
 pushgateway:
   enabled: false
+
+# Cấu hình sub-chart kube-state-metrics
+kube-state-metrics:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      host: 127.0.0.1
+  readinessProbe:
+    httpGet:
+      host: 127.0.0.1
+
+# Cấu hình sub-chart prometheus-node-exporter
+prometheus-node-exporter:
+  enabled: true
+  extraArgs:
+    - --web.listen-address=0.0.0.0:9100
+  livenessProbe:
+    httpGet:
+      host: 127.0.0.1
+  readinessProbe:
+    httpGet:
+      host: 127.0.0.1
