@@ -1,0 +1,11 @@
+{
+  "id": "stock-1",
+  "ticker": "FPT",
+  "open_price": 95.5,
+  "close_price": 98.2,
+  "high_price": 99.0,
+  "low_price": 95.0,
+  "volume": 1500000,
+  "trading_date": "2026-05-29",
+  "created_at": "2026-05-29T22:00:00Z"
+}

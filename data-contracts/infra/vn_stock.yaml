@@ -1,0 +1,14 @@
+name: vn_stock
+schema_file: data-contracts/schemas/vn_stock.avsc
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: vn_stock-schema
+  type: AVRO
+kafka:
+  topic: sentiment-pulse.vn_stock
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+airflow:
+  schedule: "0 0 * * *"
+  output_dag_path: dags/vn_stock_dag.py
+producer:
+  output_path: api_crawler/vn_stock/producer.py

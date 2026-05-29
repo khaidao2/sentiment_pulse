@@ -1,0 +1,14 @@
+name: news
+schema_file: data-contracts/schemas/news.avsc
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: news-schema
+  type: AVRO
+kafka:
+  topic: sentiment-pulse.news
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+airflow:
+  schedule: "0 0 * * *"
+  output_dag_path: dags/news_dag.py
+producer:
+  output_path: api_crawler/news/producer.py
