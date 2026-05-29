@@ -19,6 +19,8 @@ producer:
 sink:
   output_path: api_crawler/vn_stock/sink.py
   target: "clickhouse"
+  batch_size: 1000
+  batch_timeout_ms: 5000
   clickhouse:
     table: "vn_stock"
     host: "clickhouse.database.svc.cluster.local"

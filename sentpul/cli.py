@@ -65,6 +65,8 @@ def render(config_dir):
                     "airflow_schedule": config["airflow"]["schedule"],
                     "schema_json_str": json.dumps(schema, indent=2),
                     "sink_target": config["sink"]["target"],
+                    "batch_size": config["sink"].get("batch_size", 1000),
+                    "batch_timeout_ms": config["sink"].get("batch_timeout_ms", 5000),
                     "clickhouse": config["sink"].get("clickhouse", {})
                 }
                 
