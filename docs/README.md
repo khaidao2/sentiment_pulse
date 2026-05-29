@@ -38,12 +38,13 @@ Lệnh này sẽ cài đặt module `sentpul` và tạo liên kết lệnh `sent
 Sau khi cài đặt, bạn có thể gõ `sent-gen --help` để xem danh sách các câu lệnh có sẵn:
 
 ### A. Sinh mã nguồn tự động (Render)
-Đọc cấu hình contract YAML từ thư mục `data-contracts/infra/` và render ra các file Python cho Kafka Producer và Airflow DAG tương ứng.
+Đọc cấu hình contract YAML từ thư mục `data-contracts/infra/` và render ra các file Python cho Kafka Producer, Kafka Sink (Consumer) và Airflow DAG tương ứng.
 ```bash
 sent-gen render
 ```
 *Kết quả:*
-- Tạo file Kafka Producer tại: `api_crawler/<source_name>/producer.py`
+- Tạo class Kafka Producer tại: `api_crawler/<source_name>/producer.py`
+- Tạo class Kafka Sink (Consumer) tại: `api_crawler/<source_name>/sink.py`
 - Tạo file Airflow DAG tại: `dags/<source_name>_dag.py`
 
 ### B. Đăng ký Schema lên Apicurio Registry
@@ -73,7 +74,51 @@ Nếu dữ liệu hợp lệ, CLI sẽ in ra thông báo `Record is VALID!`. N�
 
 ---
 
-## 4. Quy trình Thêm một Nguồn Dữ liệu Mới (Data Source)
+## 4. Cách sử dụng Class Python của Producer và Sink
+
+Các file code sinh ra là các class Python hoàn chỉnh, cho phép bạn dễ dàng import và tích hợp vào các mã nguồn Python khác của dự án.
+
+### A. Sử dụng Producer để gửi dữ liệu lên Kafka (Tự động Validate & Serialize Avro):
+```python
+from api_crawler.news.producer import NewsProducer
+
+# Khởi tạo Producer (mặc định lấy bootstrap_servers từ config YAML)
+producer = NewsProducer(bootstrap_servers="localhost:9092")
+
+# Dữ liệu tin tức cần gửi
+data = {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "title": "Tin tức thị trường",
+    "content": "Giá cổ phiếu biến động mạnh...",
+    "source": "Cafef",
+    "published_at": "2026-05-29T22:00:00Z",
+    "created_at": "2026-05-29T22:01:00Z"
+}
+
+# Gửi dữ liệu (Class sẽ tự động validate qua Avro Schema, serialize sang binary rồi push lên Kafka)
+producer.send(data)
+```
+
+### B. Sử dụng Sink để đọc dữ liệu từ Kafka và ghi vào ClickHouse:
+Bạn có thể import class để chạy tích hợp hoặc chạy file script Sink trực tiếp:
+```bash
+# Chạy script Sink độc lập để lắng nghe và chuyển dữ liệu về ClickHouse liên tục
+python api_crawler/news/sink.py
+```
+Hoặc import trong code:
+```python
+from api_crawler.news.sink import NewsSink
+
+# Khởi tạo Sink
+sink = NewsSink(bootstrap_servers="localhost:9092")
+
+# Bắt đầu vòng lặp lắng nghe từ Kafka, tự động validate và push data vào ClickHouse
+sink.start_consuming()
+```
+
+---
+
+## 5. Quy trình Thêm một Nguồn Dữ liệu Mới (Data Source)
 
 Để mở rộng hệ thống thêm một nguồn dữ liệu mới (ví dụ: `social_media`):
 
@@ -83,4 +128,4 @@ Nếu dữ liệu hợp lệ, CLI sẽ in ra thông báo `Record is VALID!`. N�
    ```bash
    sent-gen run-all
    ```
-4. Hệ thống sẽ tự động tạo file Producer tại `api_crawler/social_media/producer.py` và DAG tại `dags/social_media_dag.py` hoàn toàn tự động!
+4. Hệ thống sẽ tự động tạo file Producer tại `api_crawler/social_media/producer.py`, Sink tại `api_crawler/social_media/sink.py` và DAG tại `dags/social_media_dag.py` hoàn toàn tự động!

@@ -63,12 +63,18 @@ def render(config_dir):
                     "kafka_topic": config["kafka"]["topic"],
                     "kafka_bootstrap_servers": config["kafka"]["bootstrap_servers"],
                     "airflow_schedule": config["airflow"]["schedule"],
-                    "schema_json_str": json.dumps(schema, indent=2)
+                    "schema_json_str": json.dumps(schema, indent=2),
+                    "sink_target": config["sink"]["target"],
+                    "clickhouse": config["sink"].get("clickhouse", {})
                 }
                 
                 # Render and write Producer
                 producer_content = render_template("producer.py.jinja", context)
                 write_rendered_file(config["producer"]["output_path"], producer_content)
+                
+                # Render and write Sink
+                sink_content = render_template("sink.py.jinja", context)
+                write_rendered_file(config["sink"]["output_path"], sink_content)
                 
                 # Render and write Airflow DAG
                 dag_content = render_template("dag.py.jinja", context)

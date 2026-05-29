@@ -1,14 +1,32 @@
 name: news
 schema_file: data-contracts/schemas/news.avsc
+
 apicurio:
   group_id: sentiment-pulse
   artifact_id: news-schema
   type: AVRO
+
 kafka:
   topic: sentiment-pulse.news
   bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+producer:
+  output_path: api_crawler/news/producer.py
+  batch_size: 16384
+  linger_ms: 10
+  acks: "1"
+
+sink:
+  output_path: api_crawler/news/sink.py
+  target: "clickhouse"
+  clickhouse:
+    table: "news"
+    host: "clickhouse.database.svc.cluster.local"
+    port: 8123
+    database: "default"
+    username: "clickhouse"
+    password: "clickhousepassword"
+
 airflow:
   schedule: "0 0 * * *"
   output_dag_path: dags/news_dag.py
-producer:
-  output_path: api_crawler/news/producer.py
