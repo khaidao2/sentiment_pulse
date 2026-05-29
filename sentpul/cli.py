@@ -73,7 +73,8 @@ def render(config_dir):
                 write_rendered_file(config["producer"]["output_path"], producer_content)
                 
                 # Render and write Sink
-                sink_content = render_template("sink.py.jinja", context)
+                sink_template = f"{config['sink']['target']}_sink.py.jinja"
+                sink_content = render_template(sink_template, context)
                 write_rendered_file(config["sink"]["output_path"], sink_content)
                 
                 # Render and write Airflow DAG
