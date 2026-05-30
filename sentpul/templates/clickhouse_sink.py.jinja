@@ -2,14 +2,43 @@
 import io
 import time
 import logging
-from kafka import KafkaConsumer
+import os
+from kafka import KafkaConsumer, KafkaProducer
 import fastavro
 {% if sink_target == 'clickhouse' %}
 import clickhouse_connect
 {% endif %}
 
+try:
+    from prometheus_client import start_http_server, Counter, Gauge, Summary
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("{{ name }}_sink")
+
+if METRICS_AVAILABLE:
+    RECORDS_PROCESSED = Counter(
+        "sink_records_processed_total",
+        "Total number of successfully processed and buffered records",
+        ["topic", "target"]
+    )
+    FLUSH_ERRORS = Counter(
+        "sink_flush_errors_total",
+        "Total number of failed flush attempts",
+        ["topic", "target"]
+    )
+    BUFFER_SIZE = Gauge(
+        "sink_buffer_size",
+        "Current size of the ingestion buffer",
+        ["topic", "target"]
+    )
+    FLUSH_DURATION = Summary(
+        "sink_flush_duration_seconds",
+        "Time spent flushing records to ClickHouse",
+        ["topic", "target"]
+    )
 
 class {{ class_name }}Sink:
     def __init__(self, bootstrap_servers=None, topic="{{ kafka_topic }}"):
@@ -21,17 +50,34 @@ class {{ class_name }}Sink:
             bootstrap_servers=bootstrap_servers,
             group_id="{{ name }}_sink_group",
             auto_offset_reset="earliest",
-            enable_auto_commit=True
+            enable_auto_commit=False
         )
         self.topic = topic
         self.schema = {{ schema_json_str }}
         self.target = "{{ sink_target }}"
         
-        # Cấu hình Batching
+        # Cấu hình Batching & Buffering
         self.batch_size = {{ batch_size }}
         self.batch_timeout_ms = {{ batch_timeout_ms }}
+        self.max_buffer_size = 100000
         self.buffer = []
         self.last_flush_time = time.time()
+
+        # DLQ configuration
+        self.dlq_topic = f"{topic}.dlq"
+        self.dlq_producer = KafkaProducer(
+            bootstrap_servers=bootstrap_servers
+        )
+        logger.info(f"Initialized DLQ producer to push to '{self.dlq_topic}'")
+
+        # Khởi động Prometheus Metrics Server nếu khả dụng
+        if METRICS_AVAILABLE:
+            metrics_port = int(os.environ.get("METRICS_PORT", 8000))
+            try:
+                start_http_server(metrics_port)
+                logger.info(f"Prometheus metrics server started on port {metrics_port}")
+            except Exception as metrics_err:
+                logger.warning(f"Could not start Prometheus server on port {metrics_port}: {metrics_err}")
         
         {% if sink_target == 'clickhouse' %}
         # Khởi tạo ClickHouse Client
@@ -50,58 +96,8 @@ class {{ class_name }}Sink:
         {% endif %}
 
     def create_table_if_not_exists(self):
-        """Generates and executes CREATE TABLE IF NOT EXISTS sql based on Avro schema fields."""
-        clickhouse_types = {
-            "string": "String",
-            "int": "Int32",
-            "long": "Int64",
-            "float": "Float32",
-            "double": "Float64",
-            "boolean": "Boolean",
-            "bytes": "String"
-        }
-        
-        columns_sql = []
-        primary_key = "id"
-        has_id = False
-        
-        for field in self.schema["fields"]:
-            field_name = field["name"]
-            field_type = field["type"]
-            
-            is_nullable = False
-            actual_type = None
-            
-            # Xử lý union type (ví dụ: ["null", "string"])
-            if isinstance(field_type, list):
-                if "null" in field_type:
-                    is_nullable = True
-                    non_null_types = [t for t in field_type if t != "null"]
-                    if non_null_types:
-                        actual_type = non_null_types[0]
-                else:
-                    actual_type = field_type[0]
-            else:
-                actual_type = field_type
-                
-            ch_type = clickhouse_types.get(actual_type, "String")
-            if is_nullable:
-                ch_type = f"Nullable({ch_type})"
-                
-            columns_sql.append(f"`{field_name}` {ch_type}")
-            if field_name == "id":
-                has_id = True
-                
-        columns_str = ", ".join(columns_sql)
-        order_by = "id" if has_id else "tuple()"
-        
-        sql = f"""
-        CREATE TABLE IF NOT EXISTS {self.table} (
-            {columns_str}
-        ) ENGINE = MergeTree()
-        ORDER BY {order_by}
-        """
-        
+        """Executes static CREATE TABLE IF NOT EXISTS sql passed from schema definition."""
+        sql = """{{ create_table_sql }}"""
         try:
             logger.info(f"Ensuring ClickHouse table '{self.table}' exists...")
             self.ch_client.command(sql)
@@ -116,7 +112,7 @@ class {{ class_name }}Sink:
         return fastavro.schemaless_reader(bytes_reader, self.schema)
 
     def validate(self, record: dict) -> bool:
-        """Validate record against Avro schema."""
+        """Validate record against Avro schema (not used in high-throughput consume loop to save CPU)."""
         try:
             fastavro.validate(record, self.schema)
             return True
@@ -125,41 +121,82 @@ class {{ class_name }}Sink:
             return False
 
     def flush(self):
-        """Flushes the buffer and writes all records to the target in one batch."""
+        """Flushes the buffer and writes all records to the target in one batch with retries."""
         if not self.buffer:
             return
         
-        try:
-            logger.info(f"Flushing {len(self.buffer)} records to ClickHouse table '{self.table}'...")
-            {% if sink_target == 'clickhouse' %}
-            self.ch_client.insert_dicts(self.table, self.buffer)
-            {% endif %}
-            logger.info("Flush successful.")
-            self.buffer.clear()
-            self.last_flush_time = time.time()
-        except Exception as e:
-            logger.error(f"Failed to flush buffer to target: {e}")
-            raise e
+        max_attempts = 3
+        backoff_seconds = [2, 4, 8]
+        
+        if METRICS_AVAILABLE:
+            start_time = time.time()
+            
+        for attempt in range(max_attempts):
+            try:
+                logger.info(f"Flushing {len(self.buffer)} records to ClickHouse table '{self.table}' (attempt {attempt + 1}/{max_attempts})...")
+                {% if sink_target == 'clickhouse' %}
+                self.ch_client.insert_dicts(self.table, self.buffer)
+                {% endif %}
+                logger.info("Flush successful.")
+                
+                if METRICS_AVAILABLE:
+                    duration = time.time() - start_time
+                    FLUSH_DURATION.labels(topic=self.topic, target=self.target).observe(duration)
+                    BUFFER_SIZE.labels(topic=self.topic, target=self.target).set(0)
+                    
+                self.buffer.clear()
+                self.last_flush_time = time.time()
+                
+                # Commit Kafka offsets manually post-insert
+                try:
+                    self.consumer.commit()
+                    logger.info("Committed Kafka offsets.")
+                except Exception as commit_err:
+                    logger.error(f"Failed to commit Kafka offsets: {commit_err}")
+                return
+            except Exception as e:
+                logger.error(f"Failed to flush buffer to target (attempt {attempt + 1}/{max_attempts}): {e}")
+                if METRICS_AVAILABLE:
+                    FLUSH_ERRORS.labels(topic=self.topic, target=self.target).inc()
+                if attempt < max_attempts - 1:
+                    sleep_time = backoff_seconds[attempt]
+                    logger.info(f"Retrying in {sleep_time} seconds...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error("Max retry attempts reached. Crashing consumer to prevent data loss.")
+                    raise e
 
     def start_consuming(self):
         """Starts the non-blocking consumer loop using poll()."""
         logger.info(f"Starting consumer loop for topic {self.topic}")
         try:
             while True:
-                # Chờ tối đa 1000ms để nhận tin nhắn mới
+                # Bounded memory check: flush if buffer is getting too large
+                if len(self.buffer) >= self.max_buffer_size:
+                    logger.warning(f"Buffer size {len(self.buffer)} reached max limit {self.max_buffer_size}. Forcing flush.")
+                    self.flush()
+                
+                # Poll for new messages (timeout 1000ms)
                 message_pack = self.consumer.poll(timeout_ms=1000)
                 for tp, messages in message_pack.items():
                     for message in messages:
                         try:
                             record = self.deserialize(message.value)
-                            if self.validate(record):
-                                self.buffer.append(record)
-                            else:
-                                logger.warning(f"Skipping invalid record: {record}")
+                            # Append record to buffer directly (schemaless deserialization succeeded)
+                            self.buffer.append(record)
+                            if METRICS_AVAILABLE:
+                                RECORDS_PROCESSED.labels(topic=self.topic, target=self.target).inc()
+                                BUFFER_SIZE.labels(topic=self.topic, target=self.target).set(len(self.buffer))
                         except Exception as e:
-                            logger.error(f"Error deserializing message: {e}")
+                            logger.error(f"Error deserializing message at offset {message.offset}: {e}")
+                            try:
+                                logger.info(f"Routing corrupted message at offset {message.offset} to DLQ '{self.dlq_topic}'")
+                                self.dlq_producer.send(self.dlq_topic, value=message.value)
+                                self.dlq_producer.flush()
+                            except Exception as dlq_err:
+                                logger.error(f"Failed to route message to DLQ: {dlq_err}")
                 
-                # Kiểm tra điều kiện flush (đạt size hoặc quá timeout)
+                # Flush conditions
                 current_time = time.time()
                 elapsed_time_ms = (current_time - self.last_flush_time) * 1000.0
                 if self.buffer and (len(self.buffer) >= self.batch_size or elapsed_time_ms >= self.batch_timeout_ms):
@@ -169,9 +206,14 @@ class {{ class_name }}Sink:
             logger.info("Consuming stopped by user.")
             if self.buffer:
                 logger.info("Flushing remaining records before exit...")
-                self.flush()
+                try:
+                    self.flush()
+                except Exception as flush_err:
+                    logger.error(f"Failed to flush remaining records: {flush_err}")
         finally:
             self.consumer.close()
+            if hasattr(self, "dlq_producer"):
+                self.dlq_producer.close()
 
 if __name__ == "__main__":
     sink = {{ class_name }}Sink()

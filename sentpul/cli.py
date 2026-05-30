@@ -10,6 +10,57 @@ def load_yaml_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+def generate_clickhouse_sql(schema: dict, table_name: str) -> str:
+    """Generates ClickHouse CREATE TABLE SQL statement from Avro schema."""
+    clickhouse_types = {
+        "string": "String",
+        "int": "Int32",
+        "long": "Int64",
+        "float": "Float32",
+        "double": "Float64",
+        "boolean": "Boolean",
+        "bytes": "String"
+    }
+    
+    columns_sql = []
+    has_id = False
+    
+    for field in schema.get("fields", []):
+        field_name = field["name"]
+        field_type = field.get("type")
+        
+        is_nullable = False
+        actual_type = None
+        
+        # Handle union types like ["null", "string"]
+        if isinstance(field_type, list):
+            if "null" in field_type:
+                is_nullable = True
+                non_null_types = [t for t in field_type if t != "null"]
+                if non_null_types:
+                    actual_type = non_null_types[0]
+            else:
+                actual_type = field_type[0]
+        else:
+            actual_type = field_type
+            
+        ch_type = clickhouse_types.get(actual_type, "String")
+        if is_nullable:
+            ch_type = f"Nullable({ch_type})"
+            
+        columns_sql.append(f"    `{field_name}` {ch_type}")
+        if field_name == "id":
+            has_id = True
+            
+    columns_str = ",\n".join(columns_sql)
+    order_by = "id" if has_id else "tuple()"
+    
+    sql = f"""CREATE TABLE IF NOT EXISTS {table_name} (
+{columns_str}
+) ENGINE = ReplacingMergeTree()
+ORDER BY {order_by};"""
+    return sql
+
 @click.group()
 def main():
     """Sentiment Pulse Data Contract CLI Tool (sent-gen)"""
@@ -56,6 +107,25 @@ def render(config_dir):
                 schema_path = config["schema_file"]
                 schema = load_avro_schema(schema_path)
                 
+                # Check / auto-generate static SQL file
+                source_name = config["name"]
+                schema_dir = os.path.dirname(schema_path)
+                sql_path = os.path.join(schema_dir, f"{source_name}.sql")
+                
+                if not os.path.exists(sql_path):
+                    click.echo(f"SQL schema file '{sql_path}' does not exist. Generating dynamically...")
+                    table_name = config.get("sink", {}).get("clickhouse", {}).get("table", source_name)
+                    sql_content = generate_clickhouse_sql(schema, table_name)
+                    os.makedirs(schema_dir, exist_ok=True)
+                    with open(sql_path, "w", encoding="utf-8") as f:
+                        f.write(sql_content)
+                else:
+                    click.echo(f"SQL schema file '{sql_path}' already exists. Skipping auto-generation.")
+                
+                # Read SQL file content to pass to template
+                with open(sql_path, "r", encoding="utf-8") as f:
+                    create_table_sql = f.read()
+                
                 # Context passed to template
                 context = {
                     "name": config["name"],
@@ -67,7 +137,8 @@ def render(config_dir):
                     "sink_target": config["sink"]["target"],
                     "batch_size": config["sink"].get("batch_size", 1000),
                     "batch_timeout_ms": config["sink"].get("batch_timeout_ms", 5000),
-                    "clickhouse": config["sink"].get("clickhouse", {})
+                    "clickhouse": config["sink"].get("clickhouse", {}),
+                    "create_table_sql": create_table_sql
                 }
                 
                 # Render and write Producer
