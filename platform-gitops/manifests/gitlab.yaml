@@ -58,8 +58,9 @@ spec:
                 
                 # Expose metrics externally for K3s Prometheus
                 gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0']
-                puma['exporter_enabled'] = true
-                puma['exporter_address'] = '0.0.0.0:8083'
+                gitlab_rails['web_exporter_enabled'] = true
+                gitlab_rails['web_exporter_address'] = '0.0.0.0'
+                gitlab_rails['web_exporter_port'] = 8083
                 sidekiq['exporter_enabled'] = true
                 sidekiq['exporter_address'] = '0.0.0.0:8082'
                 gitaly['prometheus_listen_addr'] = '0.0.0.0:9236'
