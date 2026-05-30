@@ -40,6 +40,8 @@ spec:
             - name: GITLAB_OMNIBUS_CONFIG
               value: |
                 external_url 'https://gitlab.sentpul.click'
+                nginx['listen_port'] = 80
+                nginx['listen_https'] = false
                 # Optimize RAM for GitLab (under 3.5GB)
                 puma['worker_processes'] = 2
                 puma['min_threads'] = 1
