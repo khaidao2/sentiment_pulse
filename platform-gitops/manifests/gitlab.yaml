@@ -106,6 +106,9 @@ spec:
                 gitlab_rails['object_store']['objects']['uploads']['bucket'] = 'gitlab-uploads'
                 gitlab_rails['object_store']['objects']['packages']['bucket'] = 'gitlab-packages'
                 gitlab_rails['object_store']['objects']['backups']['bucket'] = 'gitlab-backups'
+                gitlab_rails['object_store']['objects']['dependency_proxy']['bucket'] = 'gitlab-dependency-proxy'
+                gitlab_rails['object_store']['objects']['terraform_state']['bucket'] = 'gitlab-terraform-state'
+                gitlab_rails['object_store']['objects']['pages']['bucket'] = 'gitlab-pages'
           resources:
             requests:
               cpu: "500m"
