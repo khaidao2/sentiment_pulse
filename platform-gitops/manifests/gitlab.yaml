@@ -100,7 +100,7 @@ spec:
                   'region' => 'us-east-1',
                   'aws_access_key_id' => 'minioadmin',
                   'aws_secret_access_key' => 'minioadminpassword',
-                  'endpoint' => 'https://minio.sentpul.click',
+                  'endpoint' => 'https://minio-api.sentpul.click',
                   'path_style' => true
                 }
                 gitlab_rails['object_store']['objects']['artifacts']['bucket'] = 'gitlab-artifacts'
