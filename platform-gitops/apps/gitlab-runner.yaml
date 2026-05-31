@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-runner
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  sources:
+    - repoURL: 'https://charts.gitlab.io'
+      chart: gitlab-runner
+      targetRevision: 0.65.0
+      helm:
+        valueFiles:
+          - $values/platform-gitops/helm-values/gitlab-runner-values.yaml
+    - repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
