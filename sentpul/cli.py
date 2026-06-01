@@ -138,7 +138,13 @@ def render(config_dir):
                     "batch_size": config["sink"].get("batch_size", 1000),
                     "batch_timeout_ms": config["sink"].get("batch_timeout_ms", 5000),
                     "clickhouse": config["sink"].get("clickhouse", {}),
-                    "create_table_sql": create_table_sql
+                    "create_table_sql": create_table_sql,
+                    # KubernetesPodOperator settings for the Airflow DAG
+                    "airflow_image": config["airflow"].get("image", "python:3.12-slim"),
+                    "airflow_namespace": config["airflow"].get("namespace", "airflow"),
+                    "airflow_command": config["airflow"].get(
+                        "command", f"echo 'No crawler command defined for {config['name']}'"
+                    ),
                 }
                 
                 # Render and write Producer
