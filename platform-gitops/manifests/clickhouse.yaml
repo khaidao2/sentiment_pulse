@@ -46,10 +46,12 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 1Gi
+            # 1Gi was OOMKilled (exit 137) repeatedly — ClickHouse idle RSS +
+            # caches exceed 1Gi. 24.3 is cgroup-aware and self-caps to the limit.
             limits:
               cpu: 1000m
-              memory: 1Gi
+              memory: 2Gi
           volumeMounts:
             - name: clickhouse-storage
               mountPath: /var/lib/clickhouse
