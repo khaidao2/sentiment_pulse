@@ -12,7 +12,7 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'sent-gen-register-job.yaml'
+      include: 'sent-gen-register-cronjob.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: kafka
