@@ -54,8 +54,4 @@ dashboards:
       gnetId: 15661
       revision: 1
       datasource: Prometheus
-    gitlab-dashboard:
-      gnetId: 11130
-      revision: 1
-      datasource: Prometheus
 
