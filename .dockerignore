@@ -1,0 +1,22 @@
+# Only api_crawler/ is needed in the image; ignore everything else to keep
+# the build context small.
+.git
+.github
+.venv
+venv
+**/__pycache__
+*.pyc
+.pytest_cache
+tests
+platform-gitops
+dags
+docs
+sentpul
+data-contracts
+reports
+scripts
+*.md
+*.json
+docker-compose.yml
+pyproject.toml
+requirements.txt

@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vn-stock-sink
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'vn_stock_sink.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

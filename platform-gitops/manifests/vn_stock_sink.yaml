@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vn-stock-sink
+  namespace: database
+  labels:
+    app: vn-stock-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vn-stock-sink
+  template:
+    metadata:
+      labels:
+        app: vn-stock-sink
+    spec:
+      containers:
+        - name: sink
+          # Built by .github/workflows/build-image.yml (public ghcr image).
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+          imagePullPolicy: Always
+          command: ["python", "/app/api_crawler/vn_stock/sink.py"]
+          ports:
+            - containerPort: 8000
+              name: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
