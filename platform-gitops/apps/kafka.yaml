@@ -23,10 +23,12 @@ spec:
           value: "true"
         - name: persistence.size
           value: "2Gi"
+        # Heap is -Xmx1024m -Xms1024m by default; the limit must exceed it
+        # (heap + off-heap/direct + page cache) or the JVM gets OOMKilled.
         - name: resources.limits.memory
-          value: "512Mi"
+          value: "2Gi"
         - name: resources.requests.memory
-          value: "256Mi"
+          value: "1Gi"
         - name: resources.requests.cpu
           value: "100m"
         - name: livenessProbe.enabled
