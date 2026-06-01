@@ -36,17 +36,19 @@ spec:
             - containerPort: 8978
               name: http
           env:
+            # All four CB_* below are required for unattended setup (no wizard).
+            # The workspace PVC must be empty on first boot for this to apply;
+            # if the wizard already ran, wipe workspace/.data and restart.
+            - name: CB_SERVER_NAME
+              value: "Sentiment Pulse CloudBeaver"
             # Public URL so CloudBeaver builds correct links behind the proxy.
             - name: CB_SERVER_URL
               value: "https://cloudbeaver.sentpul.click"
-            # Pre-seed an admin so first run is not blocked by the setup wizard.
-            # Auth to the web app is gated by Keycloak (oauth2-proxy) in front;
-            # enable "anonymous access" in the admin UI once so users are not
-            # asked to log in a second time. See scripts/cloudbeaver_keycloak.sh.
             - name: CB_ADMIN_NAME
               value: "cbadmin"
+            # Must satisfy CloudBeaver's password policy (upper+lower+digit).
             - name: CB_ADMIN_PASSWORD
-              value: "cbadminpassword"
+              value: "CbAdmin2026!"
           resources:
             requests:
               cpu: 100m
