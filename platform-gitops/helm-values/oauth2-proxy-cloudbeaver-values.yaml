@@ -18,6 +18,9 @@ config:
     set_xauthrequest = true
     pass_user_headers = true
     cookie_secure = false # Local dev: TLS terminated at Cloudflare
+    # Keycloak users are created by admin without SMTP email verification,
+    # so id_token has email_verified=false. Accept it (internal IdP).
+    insecure_oidc_allow_unverified_email = true
 
 resources:
   requests:
