@@ -1,0 +1,12 @@
+# Runtime dependencies for the vn_stock crawler + generated producer/sink.
+# Install:  pip install -r api_crawler/vn_stock/requirements.txt
+
+# Crawler (src/) — fetches OHLCV from the vnstock Market API (returns DataFrame).
+vnstock
+pandas>=2.0.0
+
+# Generated producer.py / sink.py
+kafka-python>=2.0.0
+fastavro>=1.4.0
+clickhouse-connect>=0.6.0
+prometheus-client>=0.12.0
