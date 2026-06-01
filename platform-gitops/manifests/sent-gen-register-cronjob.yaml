@@ -24,6 +24,7 @@ spec:
               args:
                 - |
                   set -e
+                  apt-get update -qq && apt-get install -y -qq --no-install-recommends git
                   pip install -q pyyaml fastavro requests click jinja2
                   git clone -q https://github.com/khaidao2/sentiment_pulse /app
                   cd /app
