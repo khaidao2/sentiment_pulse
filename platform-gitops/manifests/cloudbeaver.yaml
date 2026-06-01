@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cloudbeaver-pvc
+  namespace: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudbeaver
+  namespace: database
+  labels:
+    app: cloudbeaver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudbeaver
+  template:
+    metadata:
+      labels:
+        app: cloudbeaver
+    spec:
+      containers:
+        - name: cloudbeaver
+          # Pin to a fixed tag in production instead of latest.
+          image: dbeaver/cloudbeaver:latest
+          ports:
+            - containerPort: 8978
+              name: http
+          env:
+            # Public URL so CloudBeaver builds correct links behind the proxy.
+            - name: CB_SERVER_URL
+              value: "https://cloudbeaver.sentpul.click"
+            # Pre-seed an admin so first run is not blocked by the setup wizard.
+            # Auth to the web app is gated by Keycloak (oauth2-proxy) in front;
+            # enable "anonymous access" in the admin UI once so users are not
+            # asked to log in a second time. See scripts/cloudbeaver_keycloak.sh.
+            - name: CB_ADMIN_NAME
+              value: "cbadmin"
+            - name: CB_ADMIN_PASSWORD
+              value: "cbadminpassword"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          volumeMounts:
+            - name: workspace
+              mountPath: /opt/cloudbeaver/workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: cloudbeaver-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudbeaver
+  namespace: database
+spec:
+  ports:
+    - port: 8978
+      targetPort: 8978
+      name: http
+  selector:
+    app: cloudbeaver

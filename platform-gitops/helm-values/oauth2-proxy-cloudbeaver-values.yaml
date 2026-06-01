@@ -1,0 +1,31 @@
+# oauth2-proxy for CloudBeaver — gates cloudbeaver.sentpul.click behind Keycloak.
+# Traffic path: cloudflared -> this oauth2-proxy -> cloudbeaver service.
+config:
+  clientID: "cloudbeaver"
+  # Must match the secret of the `cloudbeaver` Keycloak client
+  # (scripts/cloudbeaver_keycloak.sh). Move to Vault for production.
+  clientSecret: "ec7b3de27e9af4bc08d35dad623abc9acd9081e2a310af45"
+  # openssl rand -base64 32 | tr -- '+/' '-_'
+  cookieSecret: "NAAgWCZSyyJLuMMQQOeQ1dDDHCQap28F9KSXqzLxhgY="
+  configFile: |-
+    provider = "oidc"
+    oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"
+    redirect_url = "https://cloudbeaver.sentpul.click/oauth2/callback"
+    upstreams = [
+        "http://cloudbeaver.database.svc.cluster.local:8978"
+    ]
+    email_domains = ["*"]
+    set_xauthrequest = true
+    pass_user_headers = true
+    cookie_secure = false # Local dev: TLS terminated at Cloudflare
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+ingress:
+  enabled: false

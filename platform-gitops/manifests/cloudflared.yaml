@@ -22,6 +22,8 @@ data:
         service: http://minio.database:9001
       - hostname: minio-api.sentpul.click
         service: http://minio.database:9000
+      - hostname: cloudbeaver.sentpul.click
+        service: http://oauth2-proxy-cloudbeaver.database:80
       - service: http_status:404
 ---
 apiVersion: apps/v1
