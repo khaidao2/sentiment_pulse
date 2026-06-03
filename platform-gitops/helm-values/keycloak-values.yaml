@@ -6,6 +6,20 @@ proxy: edge
 extraEnvVars:
   - name: KC_PROXY
     value: "edge"
+  # Ép Keycloak sinh URL https (đứng sau Cloudflare/cloudflared cắt TLS ở edge,
+  # nói http xuống service:80). Nếu thiếu sẽ bị ssl_required + redirect_uri http://.
+  - name: KC_HOSTNAME
+    value: "auth.sentpul.click"
+  - name: KC_HOSTNAME_URL
+    value: "https://auth.sentpul.click"
+  - name: KC_HOSTNAME_ADMIN_URL
+    value: "https://auth.sentpul.click"
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
+  - name: KC_HOSTNAME_STRICT_HTTPS
+    value: "false"
+  - name: PROXY_ADDRESS_FORWARDING
+    value: "true"
 
 auth:
   adminUser: admin
