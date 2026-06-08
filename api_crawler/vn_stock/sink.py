@@ -188,7 +188,9 @@ ORDER BY id;"""
             try:
                 logger.info(f"Flushing {len(self.buffer)} records to ClickHouse table '{self.table}' (attempt {attempt + 1}/{max_attempts})...")
                 
-                self.ch_client.insert_dicts(self.table, self.buffer)
+                column_names = list(self.buffer[0].keys())
+                rows = [[record[col] for col in column_names] for record in self.buffer]
+                self.ch_client.insert(self.table, rows, column_names=column_names)
                 
                 logger.info("Flush successful.")
                 

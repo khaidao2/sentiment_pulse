@@ -23,6 +23,22 @@ spec:
               value: local
             - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
               value: kafka.kafka.svc.cluster.local:9092
+            # Native OIDC SSO via Keycloak (same pattern as MinIO — no
+            # oauth2-proxy needed). Client created by scripts/kafka_ui_keycloak.sh.
+            - name: AUTH_TYPE
+              value: OAUTH2
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENTID
+              value: kafka-ui
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENTSECRET
+              value: "736d99c12362911eeb9837cc08dcc7d83fa2af3c20485851"
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_SCOPE
+              value: openid,profile,email
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_REDIRECT_URI
+              value: "https://kafka.sentpul.click/login/oauth2/code/keycloak"
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI
+              value: "https://auth.sentpul.click/realms/data-platform"
+            - name: SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_NAME_ATTRIBUTE
+              value: preferred_username
           resources:
             requests:
               cpu: 100m
