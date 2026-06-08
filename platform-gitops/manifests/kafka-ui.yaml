@@ -38,6 +38,13 @@ spec:
               value: "736d99c12362911eeb9837cc08dcc7d83fa2af3c20485851"
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_SCOPE
               value: openid,profile,email
+            # Hardcoded — kafka-ui computes this dynamically from the
+            # incoming request scheme by default, which becomes "http://"
+            # when Cloudflare forwards a plain-HTTP request, mismatching the
+            # "https://" URI registered in Keycloak ("Invalid parameter:
+            # redirect_uri"). Same fix pattern as CloudBeaver/MinIO.
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_REDIRECT_URI
+              value: "https://kafka.sentpul.click/login/oauth2/code/keycloak"
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_ISSUER_URI
               value: "https://auth.sentpul.click/realms/data-platform"
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_USER_NAME_ATTRIBUTE
