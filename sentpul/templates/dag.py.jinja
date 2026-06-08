@@ -19,6 +19,7 @@ with DAG(
     description='Crawl {{ name }} data pipeline',
     schedule='{{ airflow_schedule }}',
     catchup=False,
+    max_active_runs=1,
 ) as dag:
 
     crawl_task = KubernetesPodOperator(

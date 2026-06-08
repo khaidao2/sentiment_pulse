@@ -16,6 +16,13 @@ def _tickers_from_env() -> List[str]:
     return tickers or list(DEFAULT_TICKERS)
 
 
+def _bool_from_env(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass
 class CrawlerConfig:
     """Runtime knobs for :class:`~src.crawler.VnStockCrawler`.
@@ -25,6 +32,9 @@ class CrawlerConfig:
     """
 
     tickers: List[str] = field(default_factory=_tickers_from_env)
+    # When true, crawl every symbol on the market (vnstock Listing.all_symbols())
+    # instead of the fixed `tickers` basket above.
+    crawl_all: bool = field(default_factory=lambda: _bool_from_env("VN_STOCK_CRAWL_ALL"))
     # Candle interval accepted by vnstock: 1m, 5m, 15m, 30m, 1h, 1D, 1W.
     interval: str = os.environ.get("VN_STOCK_INTERVAL", "1D")
     # How many days back to fetch when start/end are not supplied.

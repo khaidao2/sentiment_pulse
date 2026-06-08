@@ -19,6 +19,7 @@ with DAG(
     description='Crawl news data pipeline',
     schedule='0 0 * * *',
     catchup=False,
+    max_active_runs=1,
 ) as dag:
 
     crawl_task = KubernetesPodOperator(

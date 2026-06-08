@@ -17,8 +17,9 @@ with DAG(
     'crawl_vn_stock_dag',
     default_args=default_args,
     description='Crawl vn_stock data pipeline',
-    schedule='0 0 * * *',
+    schedule='0 */4 * * *',
     catchup=False,
+    max_active_runs=1,
 ) as dag:
 
     crawl_task = KubernetesPodOperator(
@@ -27,7 +28,7 @@ with DAG(
         namespace='airflow',
         image='ghcr.io/khaidao2/sentiment-pulse-crawler:latest',
         cmds=['bash', '-lc'],
-        arguments=["""cd /app && VN_STOCK_TICKERS=FPT,VCB,HPG VN_STOCK_LOOKBACK_DAYS=7 python -m api_crawler.vn_stock.src"""],
+        arguments=["""cd /app && VN_STOCK_CRAWL_ALL=true VN_STOCK_LOOKBACK_DAYS=7 python -m api_crawler.vn_stock.src"""],
         in_cluster=True,
         get_logs=True,
         on_finish_action='delete_pod',

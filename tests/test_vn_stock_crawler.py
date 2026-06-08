@@ -3,7 +3,7 @@
 import datetime
 
 from config import CrawlerConfig
-from crawler import VnStockCrawler, _rows
+from crawler import VnStockCrawler, _rows, _symbols
 
 ROW = {"time": datetime.date(2024, 1, 2), "open": 55.05, "high": 55.52,
        "low": 54.59, "close": 55.45, "volume": 1785800}
@@ -35,6 +35,30 @@ class FakeMarket:
         return FakeEquity(self.calls)
 
 
+class FakeSymbolFrame:
+    """Mimics a pandas DataFrame with a 'symbol' column for all_symbols()."""
+    def __init__(self, symbols):
+        self.columns = ["symbol", "organ_name"]
+        self._symbols = symbols
+
+    def __getitem__(self, key):
+        assert key == "symbol"
+        return self
+
+    def tolist(self):
+        return list(self._symbols)
+
+
+class FakeListing:
+    def __init__(self, symbols):
+        self._symbols = symbols
+        self.calls = 0
+
+    def all_symbols(self):
+        self.calls += 1
+        return FakeSymbolFrame(self._symbols)
+
+
 class FakeProducer:
     def __init__(self):
         self.sent = []
@@ -43,10 +67,11 @@ class FakeProducer:
         self.sent.append(record)
 
 
-def _crawler(producer, market=None, **cfg):
+def _crawler(producer, market=None, listing=None, **cfg):
     return VnStockCrawler(
         producer=producer,
         market=market or FakeMarket(),
+        listing=listing,
         config=CrawlerConfig(**cfg),
     )
 
@@ -99,3 +124,32 @@ def test_rows_normalises_dataframe_list_and_none():
     assert _rows(None) == []
     assert _rows([{"a": 1}]) == [{"a": 1}]
     assert _rows(FakeOHLCV([{"a": 1}, {"b": 2}])) == [{"a": 1}, {"b": 2}]
+
+
+def test_symbols_normalises_dataframe_list_and_none():
+    assert _symbols(None) == []
+    assert _symbols(["fpt", " vcb ", ""]) == ["FPT", "VCB"]
+    assert _symbols(FakeSymbolFrame(["fpt", "hpg"])) == ["FPT", "HPG"]
+
+
+def test_crawl_all_resolves_tickers_from_listing_and_ignores_configured_basket():
+    producer = FakeProducer()
+    market = FakeMarket()
+    listing = FakeListing(["fpt", "vcb", "hpg"])
+    crawler = _crawler(
+        producer, market, listing,
+        tickers=["IGNORED"], crawl_all=True, interval="1D",
+    )
+
+    total = crawler.crawl()
+
+    assert listing.calls == 1
+    assert total == 6                      # 3 tickers x 2 rows
+    assert {r["ticker"] for r in producer.sent} == {"FPT", "VCB", "HPG"}
+
+
+def test_crawl_all_disabled_uses_configured_tickers_without_building_listing():
+    crawler = _crawler(FakeProducer(), tickers=["FPT"], crawl_all=False)
+
+    assert crawler._resolve_tickers() == ["FPT"]
+    assert crawler._listing is None        # never built — no vnstock import needed

@@ -41,7 +41,8 @@ Config via environment variables:
 
 | Var                       | Default                  | Meaning                          |
 |---------------------------|--------------------------|----------------------------------|
-| `VN_STOCK_TICKERS`        | `FPT,VCB,HPG,VNM,VIC`    | Comma-separated tickers.         |
+| `VN_STOCK_TICKERS`        | `FPT,VCB,HPG,VNM,VIC`    | Comma-separated tickers (ignored when `VN_STOCK_CRAWL_ALL` is on). |
+| `VN_STOCK_CRAWL_ALL`      | `false`                  | When `true`/`1`/`yes`, crawl every symbol on the market via vnstock `Listing().all_symbols()` instead of `VN_STOCK_TICKERS`. |
 | `VN_STOCK_INTERVAL`       | `1D`                     | `1m,5m,15m,30m,1h,1D,1W`.        |
 | `VN_STOCK_LOOKBACK_DAYS`  | `7`                      | Rolling window when no start/end.|
 | `VN_STOCK_START` / `_END` | *(unset)*                | Explicit `YYYY-MM-DD` window.    |

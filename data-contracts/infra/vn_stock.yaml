@@ -30,12 +30,12 @@ sink:
     password: "clickhousepassword"
 
 airflow:
-  schedule: "0 0 * * *"
+  schedule: "0 */4 * * *"
   output_dag_path: dags/vn_stock_dag.py
   namespace: airflow
   image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
   # Image already has code + deps; just run the crawler.
   command: >-
     cd /app &&
-    VN_STOCK_TICKERS=FPT,VCB,HPG VN_STOCK_LOOKBACK_DAYS=7
+    VN_STOCK_CRAWL_ALL=true VN_STOCK_LOOKBACK_DAYS=7
     python -m api_crawler.vn_stock.src

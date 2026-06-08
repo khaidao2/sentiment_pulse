@@ -6,7 +6,7 @@ This document describes in detail the architecture of the Data Ingestion Pipelin
 
 ## 1. Architecture Diagram
 
-The diagram below represents the end-to-end flow of data from the source (Crawler) through Kafka (Redpanda) to its final, optimized storage in ClickHouse, alongside the control and Schema management flows driven by the `sent-gen` CLI:
+The diagram below represents the end-to-end flow of data from the source (Crawler) through Kafka (Redpanda) to its final, optimized storage in ClickHouse, alongside the control/codegen flow driven by the `sent-gen` CLI and the run-time Schema Registry interactions performed by the generated Producer and Sink themselves:
 
 ```mermaid
 flowchart TD
@@ -15,18 +15,20 @@ flowchart TD
         AVSC[data-contracts/schemas/*.avsc] -->|Read Avro Schema| CLI
         CLI -->|Generate Table & Save| SQL[data-contracts/schemas/*.sql]
         SQL -->|Statically Inject Into| SinkTemplate[clickhouse_sink.py.jinja]
-        CLI -->|1. Register Schema| Apicurio[Apicurio Registry]
-        CLI -->|2. Generate Python Code| GeneratedFiles[api_crawler/ & dags/]
+        CLI -->|Pre-register Schema optional| Apicurio[Apicurio Registry]
+        CLI -->|Generate Python Code| GeneratedFiles[api_crawler/ & dags/]
     end
 
     subgraph Data_Pipeline [Run-time Data Flow]
         Airflow[Airflow DAG] -->|Periodically Trigger| Crawler[API Crawler]
         Crawler -->|Send Python Dict| Producer[Kafka Producer Class]
-        Producer -->|Avro Validate & Schemaless Serialize| Producer
-        Producer -->|Push Binary Data| Kafka[Kafka / Redpanda Broker]
+        Producer -->|Get-or-register schema, fetch globalId| Apicurio
+        Producer -->|Avro Validate & Serialize with magic-byte+globalId header| Producer
+        Producer -->|Push Framed Binary Data| Kafka[Kafka / Redpanda Broker]
         
         Kafka -->|Poll Message Batch| Sink[Kafka Sink Consumer]
-        Sink -->|Schemaless Deserialize| Sink
+        Sink -->|Read globalId from header, resolve & cache schema| Apicurio
+        Sink -->|Decode Avro payload with resolved schema| Sink
         Sink -->|Accumulate in Buffer| Sink
         Sink -->|Reached Batch Size / Timeout| Sink
         
@@ -49,17 +51,18 @@ The system uses the **Schema-as-Code** philosophy. Every data source is describe
 - **Avro Schema (`.avsc`)**: Defines the structure, data types, and required/nullable fields of the messages.
 - **Contract YAML**: Defines infrastructure information (Kafka topic, ClickHouse host/port/database/table, Airflow DAG schedule, and output path for generated code).
 - **CLI Tool (`sent-gen`)**: Acts as a compiler:
-  - Automates registering schemas to the Apicurio Registry for sharing schemas with other services in the K3s cluster.
+  - Can pre-register schemas to the Apicurio Registry (`sent-gen register`) so they're discoverable by other services in the K3s cluster ahead of time — though the generated Producer also does this lazily at startup (see 2.2).
   - Automates generating Python source code (`producer.py`, `sink.py`, `dag.py`) so developers can simply import and use the generated classes without dealing with complex connection and serialization/deserialization logic.
 
 ### 2.2. Kafka Producer
 - Packages data and publishes it to the message queue.
 - Performs **Avro validation** before sending to prevent bad data at the source, protecting downstream consumers from crashing due to malformed payloads.
-- Uses **Schemaless Avro Binary Serialization**: removes schema metadata from each published message payload (only raw binary data is sent), drastically reducing network bandwidth and storage overhead on Kafka.
+- **Registry-aware wire-format serialization**: on startup, the Producer asks Apicurio Registry for its schema's `globalId` (`GET .../artifacts/{artifactId}/meta`), registering the schema there first if it isn't present yet (`POST .../artifacts`). Every published message is then framed with the standard schema-registry wire format — **1 magic byte (`0x0`) + the schema's 4-byte big-endian `globalId`** — followed by the raw Avro binary payload. This keeps messages compact while still letting any consumer identify exactly which schema version produced a given message.
 
 ### 2.3. Kafka Sink (Consumer) & ClickHouse Ingestion
 Specifically optimized for ClickHouse (columnar database) with production-ready patterns:
 - **Manual Offset Commit (`enable_auto_commit=False`)**: Disables Kafka's default auto-commit mechanism to prevent data loss. Message offsets are only committed to the Kafka broker after ClickHouse successfully acknowledges writing the batch to disk.
+- **Dynamic, registry-resolved deserialization**: for each message, the Sink reads the wire-format header to get the producer's schema `globalId`, then resolves the matching Avro schema via `resolve_schema()` — fetching it from Apicurio Registry (`GET .../ids/globalIds/{globalId}`) on first use and **caching it by `globalId`** so repeat lookups are free. This means the Producer and Sink no longer have to be redeployed in lockstep: messages written under an older or newer schema version than the one baked into the Sink still decode correctly. If Apicurio is unreachable, the Sink falls back to its own locally embedded schema with a warning, so the pipeline keeps running.
 - **Batching & Buffering**: Accumulates messages in an ingestion buffer and writes them in batches (`insert_dicts`) when the batch size limit is met (e.g., 1000 records) or after a timeout (e.g., 5 seconds). This avoids the severe ClickHouse **"Too many parts"** error caused by continuous tiny writes.
 - **Static SQL Database Table Initialization**: Rather than dynamically mapping tables at runtime via Python code (which makes infrastructure management difficult), the CLI generates a static SQL file (`.sql`) on the first render. This file is directly loaded by the Sink class to verify and create the table. Users can customize storage engines (e.g., changing from `MergeTree` to `ReplacingMergeTree`, partitioning keys, or custom sorting indexes) directly in the static SQL file without fear of it being overwritten on subsequent renders.
 
@@ -75,7 +78,8 @@ The system implements advanced safety patterns to ensure reliable operations und
 | **ClickHouse bottlenecks / freezes due to too many parts** | Batching & Flush Timeout | Accumulate data in the `buffer`. Trigger flush when `len(buffer) >= batch_size` OR when the elapsed time since the last flush exceeds `batch_timeout_ms`. |
 | **Consumer Out of Memory (OOM) during large Kafka consumer lag** | Bounded Buffer Size Limit (`max_buffer_size = 100000`) | Set a hard limit on the buffer size. If the buffer exceeds this limit, force an immediate flush before polling new messages. |
 | **Transient ClickHouse connection dropouts / overloads** | Retry Loop with Exponential Backoff | If a flush fails, the consumer does not crash immediately. It retries up to 3 times with increasing backoffs (2s, 4s, 8s). If it fails after 3 attempts, it crashes to trigger system alerts (Kubernetes restart) without committing offsets. |
-| **High CPU usage on the Consumer** | Remove redundant runtime validation | Remove `fastavro.validate` calls from the polling loop. Schemaless deserialization acts as a natural validation step; malformed payloads will fail deserialization and raise errors. |
+| **High CPU usage on the Consumer** | Remove redundant runtime validation | Remove `fastavro.validate` calls from the polling loop. Avro deserialization acts as a natural validation step; malformed payloads will fail deserialization and raise errors. |
+| **Schema drift between Producer and Sink during rollout** | Dynamic schema resolution by `globalId` + per-`globalId` cache | The Sink reads the `globalId` from each message's wire-format header and resolves the exact schema it was encoded with via Apicurio Registry, caching results by `globalId`. Old and new schema versions can therefore coexist on the same topic without requiring synchronized redeploys. |
 | **Difficulty optimizing and tweaking database schemas** | Auto-generate & Preserve Static SQL | The `.sql` schema file is generated dynamically only if it does not exist. If it exists, the CLI preserves it, allowing DB Engineers to customize storage engines, sorting keys, partition schemas, or TTLs. |
 | **Malformed/corrupted messages blocking the pipeline or silent loss** | Dead Letter Queue (DLQ) | When deserialization fails, the consumer routes the raw bytes of the malformed message to a `{topic}.dlq` topic using an independent `KafkaProducer` and commits the offset to keep the pipeline moving. |
 | **Missing real-time monitoring and alerting** | Integrate Prometheus Metrics Server | Automatically starts an HTTP server on `METRICS_PORT` (default 8000) using the `prometheus-client` library, exposing key metrics such as throughput, buffer size, flush durations, and write errors. |

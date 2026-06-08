@@ -108,6 +108,7 @@ The system integrates a minimal Kafka cluster alongside administrative and Schem
 3. **Apicurio Registry (Schema Registry)**:
    - Stores and manages Schema Contracts (Avro, JSON Schema). Uses a lightweight in-memory storage version.
    - Service: `apicurio.kafka.svc.cluster.local` (port 80)
+   - Used not only by `sent-gen` for ahead-of-time registration, but also **at runtime** by the generated Producers (get-or-register schema, fetch `globalId` to frame messages) and Sinks (resolve & cache schemas by `globalId` to decode messages — see `docs/architecture.md`).
 
 ---
 

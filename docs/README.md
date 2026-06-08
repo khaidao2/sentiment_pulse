@@ -58,6 +58,8 @@ export APICURIO_REGISTRY_URL="https://apicurio.sentpul.click"
 sent-gen register
 ```
 
+> **Heads-up — runtime registry interaction:** running `sent-gen register` is convenience/bootstrapping only. The **generated Producer and Sink classes also talk to Apicurio Registry at runtime** (see section 4), so wherever they're deployed, `APICURIO_REGISTRY_URL` must resolve to a reachable Apicurio instance — otherwise the Producer fails to start (it needs a `globalId` to frame messages) and the Sink falls back to its locally embedded schema for decoding.
+
 ### C. Run All (Run All)
 Runs both schema registration to Apicurio and automatic source code generation:
 ```bash
@@ -78,11 +80,13 @@ If the data is valid, the CLI will output `Record is VALID!`. If it fails, the C
 
 The generated files are complete, importable Python classes, allowing you to easily integrate them into other Python scripts in your project.
 
-### A. Using the Producer to send data to Kafka (Auto-Validation & Avro Serialization):
+### A. Using the Producer to send data to Kafka (Auto-Validation & Registry-aware Avro Serialization):
+On `__init__`, the Producer calls Apicurio Registry to fetch its schema's `globalId` — registering the schema there first if it isn't present yet — and frames every message with the standard wire-format header (`magic byte (0x0)` + 4-byte big-endian `globalId`) followed by the raw Avro payload. This requires `APICURIO_REGISTRY_URL` (or its in-cluster default) to be reachable when the Producer starts up.
 ```python
 from api_crawler.news.producer import NewsProducer
 
-# Initialize the Producer (defaults to bootstrap_servers from the YAML config)
+# Initialize the Producer (defaults to bootstrap_servers from the YAML config).
+# This also calls Apicurio Registry to get-or-register the schema and resolve its globalId.
 producer = NewsProducer(bootstrap_servers="localhost:9092")
 
 # News data to send
@@ -95,11 +99,14 @@ data = {
     "created_at": "2026-05-29T22:01:00Z"
 }
 
-# Send data (the class will automatically validate it against the Avro Schema, serialize it to binary, and push to Kafka)
+# Send data: the class validates it against the Avro Schema, serializes it to
+# Avro binary framed with the magic-byte + schema globalId header, and pushes it to Kafka
 producer.send(data)
 ```
 
 ### B. Using the Sink to consume data from Kafka and insert into ClickHouse:
+For each message, the Sink reads the schema `globalId` from the wire-format header and resolves the matching Avro schema via `resolve_schema()` — fetching it from Apicurio Registry on first use and **caching it by `globalId`** so repeated lookups are free. This lets the Sink correctly decode messages produced under older or newer schema versions than the one baked into it (no need to redeploy Producer and Sink in lockstep). If Apicurio is unreachable, it falls back to its locally embedded schema with a warning.
+
 You can import the class for integration or run the Sink script file directly:
 ```bash
 # Run the Sink script independently to constantly listen and forward data to ClickHouse

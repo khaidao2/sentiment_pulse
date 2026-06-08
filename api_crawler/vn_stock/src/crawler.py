@@ -39,16 +39,30 @@ def _rows(ohlcv: Any) -> List[Mapping[str, Any]]:
     return list(ohlcv)
 
 
+def _symbols(all_symbols_result: Any) -> List[str]:
+    """Normalise a vnstock Listing.all_symbols() result (DataFrame or list) to an upper-cased ticker list."""
+    if all_symbols_result is None:
+        return []
+    columns = getattr(all_symbols_result, "columns", None)
+    if columns is not None and "symbol" in columns:  # pandas DataFrame
+        all_symbols_result = all_symbols_result["symbol"].tolist()
+    return [str(s).strip().upper() for s in all_symbols_result if str(s).strip()]
+
+
 class VnStockCrawler:
     def __init__(
         self,
         producer: Producer,
         market: Optional[Any] = None,
+        listing: Optional[Any] = None,
         config: Optional[CrawlerConfig] = None,
     ):
         self.producer = producer
         self.config = config or CrawlerConfig()
         self.market = market if market is not None else self._build_market()
+        # Built lazily on first use (only needed when config.crawl_all is set)
+        # so importing/running the crawler never requires vnstock unless asked.
+        self._listing = listing
 
     @staticmethod
     def _build_market() -> Any:
@@ -56,6 +70,23 @@ class VnStockCrawler:
         from vnstock.ui import Market
 
         return Market()
+
+    @staticmethod
+    def _build_listing() -> Any:
+        from vnstock import Listing
+
+        return Listing()
+
+    def _resolve_tickers(self) -> List[str]:
+        """Resolve which tickers to crawl: every market symbol when `crawl_all`
+        is set, otherwise the fixed basket from :class:`CrawlerConfig`."""
+        if not self.config.crawl_all:
+            return list(self.config.tickers)
+        if self._listing is None:
+            self._listing = self._build_listing()
+        symbols = _symbols(self._listing.all_symbols())
+        logger.info("crawl_all enabled: resolved %d symbols from the market listing", len(symbols))
+        return symbols
 
     def _window(self) -> tuple[str, str]:
         """Resolve the (start, end) date window in 'YYYY-MM-DD' form."""
@@ -91,8 +122,9 @@ class VnStockCrawler:
         return sent
 
     def crawl(self, tickers: Optional[Iterable[str]] = None) -> int:
-        """Crawl every configured ticker. Returns total records produced."""
-        tickers = list(tickers) if tickers is not None else self.config.tickers
+        """Crawl every configured ticker (or every market symbol when `crawl_all`
+        is set). Returns total records produced."""
+        tickers = list(tickers) if tickers is not None else self._resolve_tickers()
         total = 0
         for ticker in tickers:
             try:
