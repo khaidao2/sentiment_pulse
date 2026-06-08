@@ -25,20 +25,27 @@ spec:
               value: kafka.kafka.svc.cluster.local:9092
             # Native OIDC SSO via Keycloak (same pattern as MinIO — no
             # oauth2-proxy needed). Client created by scripts/kafka_ui_keycloak.sh.
+            #
+            # v0.7.x uses its own AUTH_OAUTH2_CLIENT_<name>_* env vars, NOT the
+            # standard SPRING_SECURITY_OAUTH2_CLIENT_* ones (those are silently
+            # ignored -> "OAuth2 authentication is enabled but no providers
+            # specified" crash on boot).
             - name: AUTH_TYPE
               value: OAUTH2
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENTID
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_ID
               value: kafka-ui
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENTSECRET
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_SECRET
               value: "736d99c12362911eeb9837cc08dcc7d83fa2af3c20485851"
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_SCOPE
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_SCOPE
               value: openid,profile,email
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_REDIRECT_URI
-              value: "https://kafka.sentpul.click/login/oauth2/code/keycloak"
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_ISSUER_URI
               value: "https://auth.sentpul.click/realms/data-platform"
-            - name: SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_NAME_ATTRIBUTE
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_USER_NAME_ATTRIBUTE
               value: preferred_username
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_NAME
+              value: keycloak
+            - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_PROVIDER
+              value: keycloak
           resources:
             requests:
               cpu: 100m
