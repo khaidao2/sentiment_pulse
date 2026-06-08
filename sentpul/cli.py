@@ -2,7 +2,7 @@ import os
 import yaml
 import json
 import click
-from sentpul.apicurio_client import register_schema
+from sentpul.apicurio_client import DEFAULT_APICURIO_URL, register_schema
 from sentpul.validator import load_avro_schema, validate_record
 from sentpul.renderer import render_template, write_rendered_file
 
@@ -127,6 +127,7 @@ def render(config_dir):
                     create_table_sql = f.read()
                 
                 # Context passed to template
+                apicurio_cfg = config.get("apicurio", {})
                 context = {
                     "name": config["name"],
                     "class_name": "".join([part.capitalize() for part in config["name"].split("_")]),
@@ -134,6 +135,9 @@ def render(config_dir):
                     "kafka_bootstrap_servers": config["kafka"]["bootstrap_servers"],
                     "airflow_schedule": config["airflow"]["schedule"],
                     "schema_json_str": json.dumps(schema, indent=2),
+                    "apicurio_group_id": apicurio_cfg.get("group_id", "default"),
+                    "apicurio_artifact_id": apicurio_cfg.get("artifact_id", config["name"]),
+                    "apicurio_default_url": DEFAULT_APICURIO_URL,
                     "sink_target": config["sink"]["target"],
                     "batch_size": config["sink"].get("batch_size", 1000),
                     "batch_timeout_ms": config["sink"].get("batch_timeout_ms", 5000),
