@@ -10,6 +10,7 @@ The producer is injected so this module stays decoupled from the auto-generated
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, timedelta
 from typing import Any, Iterable, List, Mapping, Optional, Protocol
 
@@ -121,16 +122,22 @@ class VnStockCrawler:
         logger.info("Produced %d records for %s", sent, ticker)
         return sent
 
-    def crawl(self, tickers: Optional[Iterable[str]] = None) -> int:
+    def crawl(self, tickers: Optional[Iterable[str]] = None, request_delay: float = 1.1) -> int:
         """Crawl every configured ticker (or every market symbol when `crawl_all`
-        is set). Returns total records produced."""
+        is set). Returns total records produced.
+
+        request_delay: seconds to sleep between tickers to stay within
+        vnstock's 60 req/min community rate limit (default 1.1s ≈ 54 req/min).
+        """
         tickers = list(tickers) if tickers is not None else self._resolve_tickers()
         total = 0
-        for ticker in tickers:
+        for i, ticker in enumerate(tickers):
             try:
                 total += self.crawl_ticker(ticker)
             except Exception:
                 logger.exception("Crawl failed for ticker %s; continuing", ticker)
+            if i < len(tickers) - 1:
+                time.sleep(request_delay)
         logger.info("vn_stock crawl finished: %d records across %d tickers",
                     total, len(tickers))
         return total

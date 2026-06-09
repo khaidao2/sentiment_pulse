@@ -81,7 +81,7 @@ def test_crawl_produces_every_row_for_every_ticker():
     market = FakeMarket()
     crawler = _crawler(producer, market, tickers=["FPT", "VCB"], interval="1D")
 
-    total = crawler.crawl()
+    total = crawler.crawl(request_delay=0)
 
     assert total == 4                      # 2 tickers x 2 rows
     assert len(producer.sent) == 4
@@ -114,7 +114,7 @@ def test_send_errors_are_isolated_per_record():
     producer = FlakyProducer()
     crawler = _crawler(producer, tickers=["FPT"])
 
-    total = crawler.crawl()      # 2 rows; first send raises, second succeeds
+    total = crawler.crawl(request_delay=0)      # 2 rows; first send raises, second succeeds
 
     assert total == 1
     assert len(producer.sent) == 1
@@ -141,7 +141,7 @@ def test_crawl_all_resolves_tickers_from_listing_and_ignores_configured_basket()
         tickers=["IGNORED"], crawl_all=True, interval="1D",
     )
 
-    total = crawler.crawl()
+    total = crawler.crawl(request_delay=0)
 
     assert listing.calls == 1
     assert total == 6                      # 3 tickers x 2 rows
