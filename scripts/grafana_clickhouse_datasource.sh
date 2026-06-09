@@ -143,4 +143,12 @@ else
   die "Unexpected HTTP ${HTTP_CODE} from Grafana (check GF_URL / credentials)."
 fi
 
+# ── enable plugin in org (needed for datasource config page to load) ──────────
+info "Enabling plugin '${DS_TYPE}' in Grafana org ..."
+MSG="$(curl -sf -X POST "${GF_URL}/api/plugins/${DS_TYPE}/settings" \
+  -u "$GF_AUTH" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true, "pinned": true}' | jq -r '.message // "ok"')"
+ok "${MSG}"
+
 ok "ClickHouse datasource '${DS_NAME}' provisioned at ${GF_URL}."

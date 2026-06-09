@@ -1,5 +1,10 @@
 adminPassword: adminpassword
 
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClassName: local-path
+
 plugins:
   - grafana-clickhouse-datasource
 
