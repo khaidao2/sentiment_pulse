@@ -1,5 +1,8 @@
 adminPassword: adminpassword
 
+plugins:
+  - grafana-clickhouse-datasource
+
 ingress:
   enabled: true
   ingressClassName: traefik
@@ -30,6 +33,19 @@ datasources:
       access: proxy
       url: http://prometheus-server.monitoring.svc.cluster.local:80
       isDefault: true
+    - name: ClickHouse
+      type: grafana-clickhouse-datasource
+      access: proxy
+      isDefault: false
+      jsonData:
+        server: clickhouse.database.svc.cluster.local
+        port: 8123
+        protocol: http
+        username: clickhouse
+        defaultDatabase: default
+        tlsSkipVerify: false
+      secureJsonData:
+        password: clickhousepassword
 
 dashboardProviders:
   dashboardproviders.yaml:
