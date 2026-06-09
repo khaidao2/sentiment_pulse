@@ -148,6 +148,21 @@ def test_crawl_all_resolves_tickers_from_listing_and_ignores_configured_basket()
     assert {r["ticker"] for r in producer.sent} == {"FPT", "VCB", "HPG"}
 
 
+def test_system_exit_from_vnstock_is_caught_and_crawl_continues():
+    """vnstock calls sys.exit() on burst quota — must not terminate the process."""
+    class SysExitMarket:
+        def equity(self, ticker):
+            raise SystemExit(1)
+
+    producer = FakeProducer()
+    crawler = _crawler(producer, market=SysExitMarket(), tickers=["FPT", "VCB"])
+
+    total = crawler.crawl(request_delay=0)
+
+    assert total == 0
+    assert len(producer.sent) == 0
+
+
 def test_crawl_all_disabled_uses_configured_tickers_without_building_listing():
     crawler = _crawler(FakeProducer(), tickers=["FPT"], crawl_all=False)
 

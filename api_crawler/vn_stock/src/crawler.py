@@ -87,6 +87,10 @@ class VnStockCrawler:
             self._listing = self._build_listing()
         symbols = _symbols(self._listing.all_symbols())
         logger.info("crawl_all enabled: resolved %d symbols from the market listing", len(symbols))
+        # all_symbols() consumes ~17 of the 20-request burst quota; wait for the
+        # quota window to reset before starting per-ticker requests.
+        logger.info("Sleeping 65s after all_symbols() to reset vnstock burst quota")
+        time.sleep(65)
         return symbols
 
     def _window(self) -> tuple[str, str]:
@@ -134,6 +138,15 @@ class VnStockCrawler:
         for i, ticker in enumerate(tickers):
             try:
                 total += self.crawl_ticker(ticker)
+            except SystemExit:
+                # vnstock calls sys.exit() when the burst quota (20 req/window) is
+                # exhausted — SystemExit bypasses `except Exception`. Sleep until the
+                # quota window resets (~52s per vnstock message) then continue.
+                logger.warning(
+                    "vnstock called sys.exit() for ticker %s — burst quota hit; sleeping 65s",
+                    ticker,
+                )
+                time.sleep(65)
             except Exception:
                 logger.exception("Crawl failed for ticker %s; continuing", ticker)
             if i < len(tickers) - 1:
