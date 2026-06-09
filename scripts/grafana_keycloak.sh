@@ -42,7 +42,23 @@ kc_upsert_client "$(jq -n --arg s "$GRAFANA_SECRET" --arg u "$GRAFANA_URL" '{
   webOrigins:                [$u],
   attributes: {
     "pkce.code.challenge.method": "S256"
-  }
+  },
+  protocolMappers: [
+    {
+      name:             "realm-roles",
+      protocol:         "openid-connect",
+      protocolMapper:   "oidc-usermodel-realm-role-mapper",
+      consentRequired:  false,
+      config: {
+        "multivalued":           "true",
+        "userinfo.token.claim":  "true",
+        "id.token.claim":        "true",
+        "access.token.claim":    "true",
+        "claim.name":            "realm_access.roles",
+        "jsonType.label":        "String"
+      }
+    }
+  ]
 }')"
 
 # ── Realm roles used by Grafana role mapping ──────────────────────────────────
