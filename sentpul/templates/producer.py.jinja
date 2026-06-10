@@ -41,27 +41,20 @@ def _apicurio_request(method: str, path: str, body: dict = None, extra_headers: 
 
 
 def get_or_register_schema_id(schema: dict) -> int:
-    """Looks up this schema's globalId in Apicurio Registry, registering it there first if it isn't present yet."""
-    status, body = _apicurio_request(
-        "GET", f"/apis/registry/v2/groups/{APICURIO_GROUP_ID}/artifacts/{APICURIO_ARTIFACT_ID}/meta"
-    )
-    if status == 200:
-        return body["globalId"]
+    """Registers this exact schema content in Apicurio Registry and returns its globalId.
 
-    logger.info(f"Schema '{APICURIO_ARTIFACT_ID}' not found in Apicurio, registering it...")
+    Uses ifExists=RETURN_OR_UPDATE so that an unchanged schema returns the
+    existing version's globalId, while a changed schema (e.g. a field type
+    migration) is registered as a new version instead of silently reusing the
+    globalId of a stale, incompatible version.
+    """
     status, body = _apicurio_request(
         "POST",
-        f"/apis/registry/v2/groups/{APICURIO_GROUP_ID}/artifacts",
+        f"/apis/registry/v2/groups/{APICURIO_GROUP_ID}/artifacts?ifExists=RETURN_OR_UPDATE",
         body=schema,
         extra_headers={"X-Registry-ArtifactId": APICURIO_ARTIFACT_ID, "X-Registry-ArtifactType": "AVRO"},
     )
     if status in (200, 201):
-        return body["globalId"]
-    if status == 409:
-        # Registered concurrently by another producer instance; just look it up.
-        _, body = _apicurio_request(
-            "GET", f"/apis/registry/v2/groups/{APICURIO_GROUP_ID}/artifacts/{APICURIO_ARTIFACT_ID}/meta"
-        )
         return body["globalId"]
     raise RuntimeError(f"Failed to register schema '{APICURIO_ARTIFACT_ID}' in Apicurio: {status} - {body}")
 
