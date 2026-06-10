@@ -7,7 +7,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from kafka import KafkaConsumer, KafkaProducer
 import fastavro
 
@@ -82,6 +82,13 @@ class {{ class_name }}Sink:
         )
         self.topic = topic
         self.schema = {{ schema_json_str }}
+        # Maps field name -> Avro logicalType, for fields that need date/datetime
+        # coercion in deserialize() (see _coerce_temporal_fields).
+        self._temporal_fields = {
+            field["name"]: field["type"]["logicalType"]
+            for field in self.schema.get("fields", [])
+            if isinstance(field["type"], dict) and "logicalType" in field["type"]
+        }
         # Cache of Apicurio globalId -> Avro schema dict, populated lazily as messages
         # tagged with new schema versions are encountered (see resolve_schema()).
         self._schema_cache = {}
@@ -193,7 +200,25 @@ class {{ class_name }}Sink:
             raise ValueError(f"Unexpected message format (magic byte={magic_byte}); expected Apicurio wire format")
         schema = self.resolve_schema(schema_id)
         bytes_reader = io.BytesIO(message_bytes[APICURIO_HEADER_SIZE:])
-        return fastavro.schemaless_reader(bytes_reader, schema)
+        record = fastavro.schemaless_reader(bytes_reader, schema)
+        return self._coerce_temporal_fields(record)
+
+    def _coerce_temporal_fields(self, record: dict) -> dict:
+        """Normalises date/timestamp fields to date/datetime objects.
+
+        Messages produced under an older string-based schema version (before
+        a Date/DateTime64 migration) decode as plain strings; ClickHouse's
+        Date and DateTime64 columns require date/datetime objects.
+        """
+        for field_name, logical_type in self._temporal_fields.items():
+            value = record.get(field_name)
+            if not isinstance(value, str):
+                continue
+            if logical_type == "date":
+                record[field_name] = date.fromisoformat(value[:10])
+            elif logical_type and logical_type.startswith("timestamp"):
+                record[field_name] = datetime.fromisoformat(value)
+        return record
 
     def validate(self, record: dict) -> bool:
         """Validate record against Avro schema (not used in high-throughput consume loop to save CPU)."""
