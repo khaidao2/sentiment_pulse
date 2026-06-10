@@ -7,8 +7,11 @@ import logging
 import os
 import urllib.error
 import urllib.request
+from datetime import date
 from kafka import KafkaConsumer, KafkaProducer
 import fastavro
+
+import boto3
 {% if sink_target == 'clickhouse' %}
 import clickhouse_connect
 {% endif %}
@@ -123,6 +126,36 @@ class {{ class_name }}Sink:
         self.create_table_if_not_exists()
         {% endif %}
 
+        # Raw landing zone (MinIO/S3): archives every raw Avro message before
+        # it's deserialized, so the pipeline can be replayed/reprocessed if the
+        # schema or downstream models change later. Optional — disabled if
+        # MinIO env vars aren't set (e.g. local/unit-test runs).
+        self.raw_bucket = os.environ.get("MINIO_RAW_BUCKET")
+        self.s3_client = None
+        if self.raw_bucket:
+            self.s3_client = boto3.client(
+                "s3",
+                endpoint_url=os.environ.get("MINIO_ENDPOINT", "http://minio.database.svc.cluster.local:9000"),
+                aws_access_key_id=os.environ.get("MINIO_ACCESS_KEY"),
+                aws_secret_access_key=os.environ.get("MINIO_SECRET_KEY"),
+            )
+            logger.info(f"Raw landing enabled: archiving to s3://{self.raw_bucket}/{self.topic}/")
+        else:
+            logger.info("MINIO_RAW_BUCKET not set; raw landing to MinIO disabled")
+
+    def archive_raw(self, message) -> None:
+        """Uploads one raw Kafka message (Apicurio-framed Avro bytes) to the
+        MinIO raw landing zone, partitioned by ingest date. Best-effort: a
+        failure here must not block the consume/flush loop."""
+        if self.s3_client is None:
+            return
+        ingest_date = date.today().isoformat()
+        key = f"{self.topic}/dt={ingest_date}/{message.partition}-{message.offset}.avro"
+        try:
+            self.s3_client.put_object(Bucket=self.raw_bucket, Key=key, Body=message.value)
+        except Exception as e:
+            logger.warning(f"Failed to archive raw message {key} to MinIO: {e}")
+
     def create_table_if_not_exists(self):
         """Executes static CREATE TABLE IF NOT EXISTS sql passed from schema definition."""
         sql = """{{ create_table_sql }}"""
@@ -233,6 +266,7 @@ class {{ class_name }}Sink:
                 message_pack = self.consumer.poll(timeout_ms=1000)
                 for tp, messages in message_pack.items():
                     for message in messages:
+                        self.archive_raw(message)
                         try:
                             record = self.deserialize(message.value)
                             # Append record to buffer directly (schemaless deserialization succeeded)

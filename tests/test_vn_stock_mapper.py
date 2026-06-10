@@ -30,8 +30,8 @@ def test_to_record_shape_and_values():
     assert rec["low_price"] == 54.59
     assert rec["close_price"] == 55.45
     assert rec["volume"] == 1785800
-    assert rec["trading_date"] == "2024-01-02"
-    assert isinstance(rec["created_at"], str) and rec["created_at"]
+    assert rec["trading_date"] == datetime.date(2024, 1, 2)
+    assert isinstance(rec["created_at"], datetime.datetime)
 
 
 def test_to_record_coerces_types():
@@ -41,14 +41,14 @@ def test_to_record_coerces_types():
 
     assert isinstance(rec["open_price"], float)
     assert isinstance(rec["volume"], int)
-    assert rec["trading_date"] == "2024-01-03"
+    assert rec["trading_date"] == datetime.date(2024, 1, 3)
 
 
 def test_to_record_handles_missing_time():
     rec = mapper.to_record("HPG", {"time": None, "open": 1, "high": 1,
                                    "low": 1, "close": 1, "volume": 1})
-    assert rec["trading_date"] == ""
-    assert rec["id"] == "HPG:"
+    assert rec["trading_date"] == datetime.date(1970, 1, 1)
+    assert rec["id"] == "HPG:1970-01-01"
 
 
 def test_record_validates_against_avro_schema():

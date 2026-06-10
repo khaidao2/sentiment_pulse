@@ -21,17 +21,23 @@ def generate_clickhouse_sql(schema: dict, table_name: str) -> str:
         "boolean": "Boolean",
         "bytes": "String"
     }
-    
+    # Avro logicalType -> ClickHouse type, takes precedence over the base type.
+    logical_types = {
+        "date": "Date",
+        "timestamp-millis": "DateTime64(3)",
+        "timestamp-micros": "DateTime64(6)",
+    }
+
     columns_sql = []
     has_id = False
-    
+
     for field in schema.get("fields", []):
         field_name = field["name"]
         field_type = field.get("type")
-        
+
         is_nullable = False
         actual_type = None
-        
+
         # Handle union types like ["null", "string"]
         if isinstance(field_type, list):
             if "null" in field_type:
@@ -43,8 +49,14 @@ def generate_clickhouse_sql(schema: dict, table_name: str) -> str:
                 actual_type = field_type[0]
         else:
             actual_type = field_type
-            
-        ch_type = clickhouse_types.get(actual_type, "String")
+
+        # Handle logical types like {"type": "int", "logicalType": "date"}
+        if isinstance(actual_type, dict):
+            ch_type = logical_types.get(actual_type.get("logicalType"))
+            if ch_type is None:
+                ch_type = clickhouse_types.get(actual_type.get("type"), "String")
+        else:
+            ch_type = clickhouse_types.get(actual_type, "String")
         if is_nullable:
             ch_type = f"Nullable({ch_type})"
             

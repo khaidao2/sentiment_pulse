@@ -10,7 +10,7 @@
     { "name": "high_price", "type": "float" },
     { "name": "low_price", "type": "float" },
     { "name": "volume", "type": "long" },
-    { "name": "trading_date", "type": "string" },
-    { "name": "created_at", "type": "string" }
+    { "name": "trading_date", "type": { "type": "int", "logicalType": "date" } },
+    { "name": "created_at", "type": { "type": "long", "logicalType": "timestamp-micros" } }
   ]
 }

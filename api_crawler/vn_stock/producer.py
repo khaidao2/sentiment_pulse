@@ -110,11 +110,17 @@ class VnStockProducer:
     },
     {
       "name": "trading_date",
-      "type": "string"
+      "type": {
+        "type": "int",
+        "logicalType": "date"
+      }
     },
     {
       "name": "created_at",
-      "type": "string"
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      }
     }
   ]
 }

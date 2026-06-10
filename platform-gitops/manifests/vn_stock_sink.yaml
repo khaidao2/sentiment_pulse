@@ -21,6 +21,21 @@ spec:
           image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
           imagePullPolicy: Always
           command: ["python", "/app/api_crawler/vn_stock/sink.py"]
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://minio.database.svc.cluster.local:9000"
+            - name: MINIO_RAW_BUCKET
+              value: "sentiment-pulse-raw"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: accessKey
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secretKey
           ports:
             - containerPort: 8000
               name: metrics

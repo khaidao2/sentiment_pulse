@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS vn_stock (
     `high_price` Float32,
     `low_price` Float32,
     `volume` Int64,
-    `trading_date` String,
-    `created_at` String
+    `trading_date` Date,
+    `created_at` DateTime64(6)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY id;
