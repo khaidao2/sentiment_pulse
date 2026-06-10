@@ -34,7 +34,6 @@ airflow:
   output_dag_path: dags/vn_stock_dag.py
   namespace: airflow
   image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
-  # Image already has code + deps; just run the crawler.
   command: >-
     cd /app &&
     VN_STOCK_CRAWL_ALL=true VN_STOCK_LOOKBACK_DAYS=7

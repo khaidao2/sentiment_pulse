@@ -112,15 +112,12 @@ def render(config_dir):
                 schema_dir = os.path.dirname(schema_path)
                 sql_path = os.path.join(schema_dir, f"{source_name}.sql")
                 
-                if not os.path.exists(sql_path):
-                    click.echo(f"SQL schema file '{sql_path}' does not exist. Generating dynamically...")
-                    table_name = config.get("sink", {}).get("clickhouse", {}).get("table", source_name)
-                    sql_content = generate_clickhouse_sql(schema, table_name)
-                    os.makedirs(schema_dir, exist_ok=True)
-                    with open(sql_path, "w", encoding="utf-8") as f:
-                        f.write(sql_content)
-                else:
-                    click.echo(f"SQL schema file '{sql_path}' already exists. Skipping auto-generation.")
+                click.echo(f"Generating SQL schema file '{sql_path}'...")
+                table_name = config.get("sink", {}).get("clickhouse", {}).get("table", source_name)
+                sql_content = generate_clickhouse_sql(schema, table_name)
+                os.makedirs(schema_dir, exist_ok=True)
+                with open(sql_path, "w", encoding="utf-8") as f:
+                    f.write(sql_content)
                 
                 # Read SQL file content to pass to template
                 with open(sql_path, "r", encoding="utf-8") as f:
