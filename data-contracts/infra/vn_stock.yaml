@@ -39,3 +39,7 @@ airflow:
     cd /app &&
     VN_STOCK_CRAWL_ALL=true VN_STOCK_LOOKBACK_DAYS=7
     python -m api_crawler.vn_stock.src
+  env_from_secrets:
+    - env_var: VNSTOCK_API_KEY
+      secret_name: vnstock-api-key
+      secret_key: apiKey

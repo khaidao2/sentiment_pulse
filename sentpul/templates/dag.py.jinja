@@ -2,6 +2,8 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+{% if env_from_secrets %}from kubernetes.client import models as k8s
+{% endif %}
 
 default_args = {
     'owner': 'airflow',
@@ -32,4 +34,15 @@ with DAG(
         in_cluster=True,
         get_logs=True,
         on_finish_action='delete_pod',
-    )
+{% if env_from_secrets %}        env_vars=[
+{% for e in env_from_secrets %}            k8s.V1EnvVar(
+                name='{{ e.env_var }}',
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(
+                        name='{{ e.secret_name }}',
+                        key='{{ e.secret_key }}',
+                    )
+                ),
+            ),
+{% endfor %}        ],
+{% endif %}    )

@@ -149,6 +149,7 @@ def render(config_dir):
                     "airflow_command": config["airflow"].get(
                         "command", f"echo 'No crawler command defined for {config['name']}'"
                     ),
+                    "env_from_secrets": config["airflow"].get("env_from_secrets", []),
                 }
                 
                 # Render and write Producer

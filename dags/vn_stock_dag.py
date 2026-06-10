@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from kubernetes.client import models as k8s
 
 default_args = {
     'owner': 'airflow',
@@ -32,4 +33,15 @@ with DAG(
         in_cluster=True,
         get_logs=True,
         on_finish_action='delete_pod',
+        env_vars=[
+            k8s.V1EnvVar(
+                name='VNSTOCK_API_KEY',
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(
+                        name='vnstock-api-key',
+                        key='apiKey',
+                    )
+                ),
+            ),
+        ],
     )
