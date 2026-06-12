@@ -6,8 +6,10 @@ WORKDIR /app
 
 # Runtime deps: crawler (vnstock, pandas) + generated producer/sink
 # (kafka-python, fastavro, clickhouse-connect, prometheus-client).
-COPY api_crawler/vn_stock/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY api_crawler/vn_stock/requirements.txt /tmp/vn_stock_requirements.txt
+COPY api_crawler/news/requirements.txt /tmp/news_requirements.txt
+COPY api_crawler/community/requirements.txt /tmp/community_requirements.txt
+RUN pip install --no-cache-dir -r /tmp/vn_stock_requirements.txt -r /tmp/news_requirements.txt -r /tmp/community_requirements.txt
 
 # Application code — api_crawler.* importable from /app.
 COPY api_crawler/ /app/api_crawler/

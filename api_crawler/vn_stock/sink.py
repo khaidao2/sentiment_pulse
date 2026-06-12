@@ -12,6 +12,7 @@ from kafka import KafkaConsumer, KafkaProducer
 import fastavro
 
 import boto3
+
 import clickhouse_connect
 
 
@@ -175,13 +176,14 @@ class VnStockSink:
         )
         self.table = "vn_stock"
         logger.info(f"Initialized ClickHouse client for table {self.table}")
-
+        
         # Tự động kiểm tra và tạo bảng ClickHouse
         self.create_table_if_not_exists()
+        
 
         # Raw landing zone (MinIO/S3): archives every raw Avro message before
         # it's deserialized, so the pipeline can be replayed/reprocessed if the
-        # schema or NLP/divergence models change later. Optional — disabled if
+        # schema or downstream models change later. Optional — disabled if
         # MinIO env vars aren't set (e.g. local/unit-test runs).
         self.raw_bucket = os.environ.get("MINIO_RAW_BUCKET")
         self.s3_client = None
@@ -196,6 +198,18 @@ class VnStockSink:
         else:
             logger.info("MINIO_RAW_BUCKET not set; raw landing to MinIO disabled")
 
+    def archive_raw(self, message) -> None:
+        """Uploads one raw Kafka message (Apicurio-framed Avro bytes) to the
+        MinIO raw landing zone, partitioned by ingest date. Best-effort: a
+        failure here must not block the consume/flush loop."""
+        if self.s3_client is None:
+            return
+        ingest_date = date.today().isoformat()
+        key = f"{self.topic}/dt={ingest_date}/{message.partition}-{message.offset}.avro"
+        try:
+            self.s3_client.put_object(Bucket=self.raw_bucket, Key=key, Body=message.value)
+        except Exception as e:
+            logger.warning(f"Failed to archive raw message {key} to MinIO: {e}")
 
     def create_table_if_not_exists(self):
         """Executes static CREATE TABLE IF NOT EXISTS sql passed from schema definition."""
@@ -218,19 +232,6 @@ ORDER BY id;"""
         except Exception as e:
             logger.error(f"Failed to create ClickHouse table: {e}")
             raise e
-
-    def archive_raw(self, message) -> None:
-        """Uploads one raw Kafka message (Apicurio-framed Avro bytes) to the
-        MinIO raw landing zone, partitioned by ingest date. Best-effort: a
-        failure here must not block the consume/flush loop."""
-        if self.s3_client is None:
-            return
-        ingest_date = date.today().isoformat()
-        key = f"{self.topic}/dt={ingest_date}/{message.partition}-{message.offset}.avro"
-        try:
-            self.s3_client.put_object(Bucket=self.raw_bucket, Key=key, Body=message.value)
-        except Exception as e:
-            logger.warning(f"Failed to archive raw message {key} to MinIO: {e}")
 
     def resolve_schema(self, schema_id: int) -> dict:
         """Returns the Avro schema registered under the given Apicurio globalId.

@@ -1,28 +1,28 @@
-name: news
-schema_file: data-contracts/schemas/news.avsc
+name: community
+schema_file: data-contracts/schemas/community.avsc
 
 apicurio:
   group_id: sentiment-pulse
-  artifact_id: news-schema
+  artifact_id: community-schema
   type: AVRO
 
 kafka:
-  topic: sentiment-pulse.news
+  topic: sentiment-pulse.community
   bootstrap_servers: kafka.kafka.svc.cluster.local:9092
 
 producer:
-  output_path: api_crawler/news/producer.py
+  output_path: api_crawler/community/producer.py
   batch_size: 16384
   linger_ms: 10
   acks: "1"
 
 sink:
-  output_path: api_crawler/news/sink.py
+  output_path: api_crawler/community/sink.py
   target: "clickhouse"
   batch_size: 1000
   batch_timeout_ms: 5000
   clickhouse:
-    table: "news"
+    table: "community"
     host: "clickhouse.database.svc.cluster.local"
     port: 8123
     database: "default"
@@ -30,7 +30,7 @@ sink:
     password: "clickhousepassword"
 
 airflow:
-  schedule: "0 0 * * *"
-  output_dag_path: dags/news_dag.py
+  schedule: "0 */2 * * *"
+  output_dag_path: dags/community_dag.py
   image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
-  command: "cd /app && python -m api_crawler.news.src"
+  command: "cd /app && python -m api_crawler.community.src"

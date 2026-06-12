@@ -44,7 +44,7 @@ except ImportError:
     METRICS_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("news_sink")
+logger = logging.getLogger("community_sink")
 
 if METRICS_AVAILABLE:
     RECORDS_PROCESSED = Counter(
@@ -68,23 +68,23 @@ if METRICS_AVAILABLE:
         ["topic", "target"]
     )
 
-class NewsSink:
-    def __init__(self, bootstrap_servers=None, topic="sentiment-pulse.news"):
+class CommunitySink:
+    def __init__(self, bootstrap_servers=None, topic="sentiment-pulse.community"):
         if bootstrap_servers is None:
             bootstrap_servers = "kafka.kafka.svc.cluster.local:9092"
             
         self.consumer = KafkaConsumer(
             topic,
             bootstrap_servers=bootstrap_servers,
-            group_id="news_sink_group",
+            group_id="community_sink_group",
             auto_offset_reset="earliest",
             enable_auto_commit=False
         )
         self.topic = topic
         self.schema = {
   "type": "record",
-  "name": "NewsRecord",
-  "namespace": "click.sentpul.news",
+  "name": "CommunityRecord",
+  "namespace": "click.sentpul.community",
   "fields": [
     {
       "name": "id",
@@ -172,7 +172,7 @@ class NewsSink:
             password="clickhousepassword",
             database="default"
         )
-        self.table = "news"
+        self.table = "community"
         logger.info(f"Initialized ClickHouse client for table {self.table}")
         
         # Tự động kiểm tra và tạo bảng ClickHouse
@@ -211,7 +211,7 @@ class NewsSink:
 
     def create_table_if_not_exists(self):
         """Executes static CREATE TABLE IF NOT EXISTS sql passed from schema definition."""
-        sql = """CREATE TABLE IF NOT EXISTS news (
+        sql = """CREATE TABLE IF NOT EXISTS community (
     `id` String,
     `title` String,
     `content` String,
@@ -384,5 +384,5 @@ ORDER BY id;"""
                 self.dlq_producer.close()
 
 if __name__ == "__main__":
-    sink = NewsSink()
+    sink = CommunitySink()
     sink.start_consuming()

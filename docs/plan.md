@@ -99,8 +99,9 @@ SentimentPulse là hệ thống **Market Intelligence Dashboard** sử dụng AI
 | Nguồn | Loại | Phương thức | Ưu tiên |
 |---|---|---|---|
 | CafeF | Báo chí tài chính | Crawler (Playwright/BS4) | P0 |
-| VnExpress | Báo chí | Crawler | P0 |
+| VnExpress | Báo chí | Crawler (curl-cffi/BS4) | P0 |
 | vnstock | OHLCV + khối ngoại | API (đã có) | P0 |
+| chungsy.vn | Cộng đồng đầu tư | API Crawler | P1 |
 | Reddit (r/VietnamInvesting) | Mạng xã hội | Reddit API | P1 |
 | Facebook Groups | Mạng xã hội | Graph API / Crawler | P2 |
 | Diễn đàn đầu tư (F319, CafeF forum) | Diễn đàn | Crawler | P1 |
@@ -156,8 +157,9 @@ divergence_score = f(
 - [x] OHLCV crawler (vnstock) + Kafka pipeline
 - [x] ClickHouse storage + Grafana dashboard
 - [x] Airflow orchestration + remote logging
-- [ ] **CafeF/VnExpress news crawler**
-- [ ] **Kafka topic `raw-news` + schema registry**
+- [x] **VnExpress news crawler (RSS & HTML)**
+- [x] **chungsy.vn community crawler (JSON API)**
+- [x] **Kafka topics `sentiment-pulse.news` & `sentiment-pulse.community` + Apicurio schema registry**
 
 ### Phase 2 — NLP Core
 - [ ] PhoBERT inference service (FastAPI + Docker)
@@ -218,6 +220,36 @@ CREATE TABLE divergence_signals (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(signal_time)
 ORDER BY (ticker, signal_time);
+```
+
+### `news` (ClickHouse)
+```sql
+CREATE TABLE IF NOT EXISTS news (
+    `id` String,
+    `title` String,
+    `content` String,
+    `author` Nullable(String),
+    `source` String,
+    `url` Nullable(String),
+    `published_at` String,
+    `created_at` String
+) ENGINE = ReplacingMergeTree()
+ORDER BY id;
+```
+
+### `community` (ClickHouse)
+```sql
+CREATE TABLE IF NOT EXISTS community (
+    `id` String,
+    `title` String,
+    `content` String,
+    `author` Nullable(String),
+    `source` String,
+    `url` Nullable(String),
+    `published_at` String,
+    `created_at` String
+) ENGINE = ReplacingMergeTree()
+ORDER BY id;
 ```
 
 ---

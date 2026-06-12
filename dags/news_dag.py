@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 
+
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -26,9 +27,9 @@ with DAG(
         task_id='crawl_news',
         name='crawl-news',
         namespace='airflow',
-        image='python:3.12-slim',
+        image='ghcr.io/khaidao2/sentiment-pulse-crawler:latest',
         cmds=['bash', '-lc'],
-        arguments=["""echo 'No crawler command defined for news'"""],
+        arguments=["""cd /app && python -m api_crawler.news.src"""],
         in_cluster=True,
         get_logs=True,
         on_finish_action='delete_pod',

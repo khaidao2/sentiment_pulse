@@ -2,7 +2,6 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from kubernetes.client import models as k8s
 
 
 default_args = {
@@ -16,33 +15,22 @@ default_args = {
 }
 
 with DAG(
-    'crawl_vn_stock_dag',
+    'crawl_community_dag',
     default_args=default_args,
-    description='Crawl vn_stock data pipeline',
-    schedule='0 */4 * * *',
+    description='Crawl community data pipeline',
+    schedule='0 */2 * * *',
     catchup=False,
     max_active_runs=1,
 ) as dag:
 
     crawl_task = KubernetesPodOperator(
-        task_id='crawl_vn_stock',
-        name='crawl-vn-stock',
+        task_id='crawl_community',
+        name='crawl-community',
         namespace='airflow',
         image='ghcr.io/khaidao2/sentiment-pulse-crawler:latest',
         cmds=['bash', '-lc'],
-        arguments=["""cd /app && VN_STOCK_CRAWL_ALL=true VN_STOCK_LOOKBACK_DAYS=7 python -m api_crawler.vn_stock.src"""],
+        arguments=["""cd /app && python -m api_crawler.community.src"""],
         in_cluster=True,
         get_logs=True,
         on_finish_action='delete_pod',
-        env_vars=[
-            k8s.V1EnvVar(
-                name='VNSTOCK_API_KEY',
-                value_from=k8s.V1EnvVarSource(
-                    secret_key_ref=k8s.V1SecretKeySelector(
-                        name='vnstock-api-key',
-                        key='apiKey',
-                    )
-                ),
-            ),
-        ],
     )
