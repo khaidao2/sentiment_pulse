@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nlp-worker
+  namespace: database
+  labels:
+    app: nlp-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nlp-worker
+  template:
+    metadata:
+      labels:
+        app: nlp-worker
+    spec:
+      containers:
+        - name: worker
+          # Built by .github/workflows/build-nlp-image.yml (public ghcr image).
+          image: ghcr.io/khaidao2/sentiment-pulse-nlp:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "nlp_pipeline.worker"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nlp-server
+  namespace: database
+  labels:
+    app: nlp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nlp-server
+  template:
+    metadata:
+      labels:
+        app: nlp-server
+    spec:
+      containers:
+        - name: server
+          # Built by .github/workflows/build-nlp-image.yml (public ghcr image).
+          image: ghcr.io/khaidao2/sentiment-pulse-nlp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nlp-server
+  namespace: database
+  labels:
+    app: nlp-server
+spec:
+  selector:
+    app: nlp-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

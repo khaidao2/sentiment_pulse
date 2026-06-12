@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-scores-sink
+  namespace: database
+  labels:
+    app: sentiment-scores-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-scores-sink
+  template:
+    metadata:
+      labels:
+        app: sentiment-scores-sink
+    spec:
+      containers:
+        - name: sink
+          # Built by .github/workflows/build-image.yml (public ghcr image).
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+          imagePullPolicy: Always
+          command: ["python", "/app/api_crawler/sentiment_scores/sink.py"]
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://minio.database.svc.cluster.local:9000"
+            - name: MINIO_RAW_BUCKET
+              value: "sentiment-pulse-raw"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: accessKey
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secretKey
+          ports:
+            - containerPort: 8000
+              name: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

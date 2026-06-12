@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "SentimentScoreRecord",
+  "namespace": "click.sentpul.sentiment",
+  "fields": [
+    { "name": "id", "type": "string" },
+    { "name": "event_time", "type": { "type": "long", "logicalType": "timestamp-micros" } },
+    { "name": "source", "type": "string" },
+    { "name": "ticker", "type": "string" },
+    { "name": "score", "type": "float" },
+    { "name": "label", "type": "string" },
+    { "name": "intensity", "type": "float" },
+    { "name": "headline", "type": "string" },
+    { "name": "url", "type": ["null", "string"], "default": null },
+    { "name": "created_at", "type": { "type": "long", "logicalType": "timestamp-micros" } }
+  ]
+}

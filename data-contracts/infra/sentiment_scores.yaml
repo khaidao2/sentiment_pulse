@@ -1,0 +1,40 @@
+name: sentiment_scores
+schema_file: data-contracts/schemas/sentiment_scores.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: sentiment_scores-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.sentiment-scores
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+producer:
+  output_path: api_crawler/sentiment_scores/producer.py
+  batch_size: 16384
+  linger_ms: 10
+  acks: "1"
+
+sink:
+  output_path: api_crawler/sentiment_scores/sink.py
+  target: "clickhouse"
+  batch_size: 1000
+  batch_timeout_ms: 5000
+  clickhouse:
+    table: "sentiment_scores"
+    host: "clickhouse.database.svc.cluster.local"
+    port: 8123
+    database: "default"
+    username: "clickhouse"
+    password: "clickhousepassword"
+
+airflow:
+  # The sentiment_scores producer is the nlp_pipeline streaming worker
+  # (a long-running Deployment, not an Airflow-scheduled crawl), so this DAG
+  # is a placeholder kept only for sent-gen consistency across contracts.
+  schedule: "@once"
+  output_dag_path: dags/sentiment_scores_dag.py
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "echo 'sentiment_scores is produced by the nlp_pipeline streaming worker, not this DAG'"
