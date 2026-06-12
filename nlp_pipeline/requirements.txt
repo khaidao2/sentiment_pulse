@@ -12,3 +12,6 @@ uvicorn[standard]>=0.18.0
 # Streaming worker (consumes news/community, produces sentiment-scores)
 kafka-python>=2.0.0
 fastavro>=1.4.0
+
+# Ticker dictionary lookup (vn_stock table)
+clickhouse-connect>=0.6.0

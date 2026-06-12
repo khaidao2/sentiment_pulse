@@ -69,18 +69,50 @@ FINANCIAL_LEXICON: dict[str, float] = {
     "cổ tức cao": 0.4,
 }
 
-# Default basket of recognized tickers + special index aliases. Extend via
-# the TICKER_DICT env var (comma-separated) to cover more symbols without a
-# code change.
+# Fallback basket of recognized tickers + special index aliases, used only
+# when neither TICKER_DICT nor the ClickHouse vn_stock table is available.
 DEFAULT_TICKERS = ["FPT", "VCB", "HPG", "VNM", "VIC", "MWG", "MSN", "VHM", "TCB", "GAS", "CTG", "BID"]
+
+# 3-letter ticker codes that collide with common uppercase Vietnamese
+# abbreviations/acronyms (and thus produce false positives once the dictionary
+# is expanded to the full ~1600-symbol VN market). Extend via TICKER_DICT_EXCLUDE.
+DEFAULT_TICKER_EXCLUDE = {"CEO", "ICT", "ONE", "PRO"}
 
 _INDEX_PATTERN = re.compile(r"\bVN[\s-]?INDEX\b|\bVN30\b", re.IGNORECASE)
 
 
-def _tickers_from_env() -> list[str]:
+def _tickers_from_clickhouse() -> list[str] | None:
+    """Loads the full list of listed tickers from the vn_stock ClickHouse table."""
+    try:
+        import clickhouse_connect
+
+        client = clickhouse_connect.get_client(
+            host=os.environ.get("CLICKHOUSE_HOST", "clickhouse.database.svc.cluster.local"),
+            port=int(os.environ.get("CLICKHOUSE_PORT", "8123")),
+            username=os.environ.get("CLICKHOUSE_USER", "clickhouse"),
+            password=os.environ.get("CLICKHOUSE_PASSWORD", "clickhousepassword"),
+            database=os.environ.get("CLICKHOUSE_DATABASE", "default"),
+        )
+        rows = client.query("SELECT DISTINCT ticker FROM vn_stock").result_rows
+        tickers = [row[0].strip().upper() for row in rows if row[0]]
+        return tickers or None
+    except Exception as e:
+        logger.warning(f"Could not load ticker dictionary from ClickHouse vn_stock table: {e}")
+        return None
+
+
+def _excluded_tickers() -> set[str]:
+    raw = os.environ.get("TICKER_DICT_EXCLUDE", "")
+    extra = {t.strip().upper() for t in raw.split(",") if t.strip()}
+    return DEFAULT_TICKER_EXCLUDE | extra
+
+
+def resolve_tickers() -> list[str]:
+    """Resolves the ticker dictionary: TICKER_DICT env > ClickHouse vn_stock > DEFAULT_TICKERS."""
     raw = os.environ.get("TICKER_DICT", "")
-    tickers = [t.strip().upper() for t in raw.split(",") if t.strip()]
-    return tickers or list(DEFAULT_TICKERS)
+    if raw:
+        return [t.strip().upper() for t in raw.split(",") if t.strip()]
+    return _tickers_from_clickhouse() or list(DEFAULT_TICKERS)
 
 
 def clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
@@ -91,15 +123,22 @@ class TickerExtractor:
     """Finds stock tickers (and the VN-Index) mentioned in a piece of text."""
 
     def __init__(self, tickers: Iterable[str] | None = None):
-        self.tickers = sorted({t.upper() for t in (tickers or _tickers_from_env())}, key=len, reverse=True)
+        excluded = _excluded_tickers()
+        resolved = {t.upper() for t in (tickers or resolve_tickers())} - excluded
+        self.tickers = sorted(resolved, key=len, reverse=True)
         pattern = r"\b(" + "|".join(re.escape(t) for t in self.tickers) + r")\b"
         self._ticker_re = re.compile(pattern)
 
     def extract(self, text: str) -> list[str]:
-        """Returns the sorted, de-duplicated tickers (and "INDEX") mentioned in ``text``."""
-        upper = text.upper()
-        found = set(self._ticker_re.findall(upper))
-        if _INDEX_PATTERN.search(upper):
+        """Returns the sorted, de-duplicated tickers (and "INDEX") mentioned in ``text``.
+
+        Matching is case-sensitive against the original text: ticker symbols are
+        written in uppercase in Vietnamese financial writing, and uppercasing the
+        whole text (as done previously) would turn every lowercase Vietnamese word
+        that happens to coincide with a 3-letter ticker code into a false match.
+        """
+        found = set(self._ticker_re.findall(text))
+        if _INDEX_PATTERN.search(text.upper()):
             found.add("INDEX")
         return sorted(found)
 
