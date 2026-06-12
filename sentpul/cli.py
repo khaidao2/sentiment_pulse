@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import json
 import click
@@ -9,6 +10,22 @@ from sentpul.renderer import render_template, write_rendered_file
 def load_yaml_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+_JSON_LITERAL_TOKENS = {"null": "None", "true": "True", "false": "False"}
+
+def schema_to_python_literal(schema: dict) -> str:
+    """Renders an Avro schema dict as Python source for embedding in templates.
+
+    json.dumps() produces JSON's null/true/false, which aren't valid Python
+    literals; Avro schemas never use those tokens as actual string values
+    (field/type names), so a word-boundary swap to None/True/False is safe.
+    """
+    json_str = json.dumps(schema, indent=2)
+    # Only swap bare (unquoted) tokens -- e.g. the `null` in `"default": null`,
+    # not the Avro union type name `"null"`.
+    return re.sub(
+        r'(?<!")\b(null|true|false)\b(?!")', lambda m: _JSON_LITERAL_TOKENS[m.group(1)], json_str
+    )
 
 def generate_clickhouse_sql(schema: dict, table_name: str) -> str:
     """Generates ClickHouse CREATE TABLE SQL statement from Avro schema."""
@@ -143,7 +160,7 @@ def render(config_dir):
                     "kafka_topic": config["kafka"]["topic"],
                     "kafka_bootstrap_servers": config["kafka"]["bootstrap_servers"],
                     "airflow_schedule": config["airflow"]["schedule"],
-                    "schema_json_str": json.dumps(schema, indent=2),
+                    "schema_json_str": schema_to_python_literal(schema),
                     "apicurio_group_id": apicurio_cfg.get("group_id", "default"),
                     "apicurio_artifact_id": apicurio_cfg.get("artifact_id", config["name"]),
                     "apicurio_default_url": DEFAULT_APICURIO_URL,

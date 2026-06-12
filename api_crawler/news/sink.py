@@ -104,7 +104,7 @@ class NewsSink:
         "null",
         "string"
       ],
-      "default": null
+      "default": None
     },
     {
       "name": "source",
@@ -116,7 +116,7 @@ class NewsSink:
         "null",
         "string"
       ],
-      "default": null
+      "default": None
     },
     {
       "name": "published_at",

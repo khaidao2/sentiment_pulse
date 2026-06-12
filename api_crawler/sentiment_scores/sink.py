@@ -127,7 +127,7 @@ class SentimentScoresSink:
         "null",
         "string"
       ],
-      "default": null
+      "default": None
     },
     {
       "name": "created_at",

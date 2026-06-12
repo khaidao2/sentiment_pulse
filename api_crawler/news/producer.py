@@ -91,7 +91,7 @@ class NewsProducer:
         "null",
         "string"
       ],
-      "default": null
+      "default": None
     },
     {
       "name": "source",
@@ -103,7 +103,7 @@ class NewsProducer:
         "null",
         "string"
       ],
-      "default": null
+      "default": None
     },
     {
       "name": "published_at",
