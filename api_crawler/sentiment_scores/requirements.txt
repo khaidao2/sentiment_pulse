@@ -1,8 +1,0 @@
-# Runtime dependencies for the generated sentiment_scores producer/sink.
-# Install:  pip install -r api_crawler/sentiment_scores/requirements.txt
-
-kafka-python>=2.0.0
-fastavro>=1.4.0
-clickhouse-connect>=0.6.0
-prometheus-client>=0.12.0
-boto3>=1.28.0
