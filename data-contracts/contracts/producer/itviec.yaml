@@ -22,7 +22,9 @@ sink:
 # the crawler never parses it, it only reads the injected env.
 crawler:
   listing_url: https://itviec.com/it-jobs
-  max_pages: 5
+  max_pages: 100        # safety ceiling only; the crawl stops when a listing
+                        # page is empty (crawl-everything). Raise if itviec ever
+                        # has more than ~100 pages of jobs.
   delay: 0.5
 
 airflow:

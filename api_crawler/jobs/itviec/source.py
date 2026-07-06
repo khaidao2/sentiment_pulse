@@ -50,6 +50,12 @@ class ItviecSource(ISource):
                 if listing is None:
                     continue
                 urls = self._detail_urls(listing)
+                if not urls:
+                    # No jobs on this page → we've walked past the last one.
+                    # This is the real "crawl everything" stop; max_pages is only
+                    # an upper safety bound.
+                    _LOG.info("listing page=%d empty → stop", page)
+                    break
                 _LOG.info("listing page=%d | %d detail urls", page, len(urls))
                 for url in urls:
                     time.sleep(self._delay)  # be polite — avoid rate limiting

@@ -39,7 +39,7 @@ with DAG(
             k8s.V1EnvVar(name="KAFKA_TOPIC", value="sentiment-pulse.itviec"),
             k8s.V1EnvVar(name="KAFKA_BOOTSTRAP_SERVERS", value="kafka.kafka.svc.cluster.local:9092"),
             k8s.V1EnvVar(name="LISTING_URL", value="https://itviec.com/it-jobs"),
-            k8s.V1EnvVar(name="MAX_PAGES", value="5"),
+            k8s.V1EnvVar(name="MAX_PAGES", value="100"),
             k8s.V1EnvVar(name="DELAY", value="0.5"),
         ],
     )
