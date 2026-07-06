@@ -1,0 +1,9 @@
+# Runtime deps for the crawler image. Kept minimal — the runtime does NOT need
+# the sentpul package (AvroKafkaProducer serializes with fastavro directly).
+curl_cffi>=0.7          # browser TLS/JA3 impersonation to pass Cloudflare
+beautifulsoup4>=4.12    # HTML parsing
+confluent-kafka>=2.3    # Kafka/Redpanda producer + consumer (same wire protocol)
+fastavro>=1.9           # Avro schemaless encode/decode
+requests>=2.31          # Apicurio schema-registry calls
+minio>=7.2              # MinIO/S3 sink (Kafka -> object storage)
+pyarrow>=15             # Parquet writer for the sink

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentpul"
+version = "0.1.0"
+description = "Sentiment Pulse data-contract toolkit: generate infra, DAGs and ClickHouse DDL from YAML contracts (sent-gen)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "pyyaml>=6.0",
+    "fastavro>=1.9",
+    "requests>=2.31",
+    "click>=8.1",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+sent-gen = "sentpul.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Ship the Jinja templates inside the installed package so renderer.py can
+# load them via FileSystemLoader at runtime (they are not .py files, so
+# setuptools would otherwise skip them).
+[tool.setuptools.package-data]
+sentpul = ["templates/*.jinja"]

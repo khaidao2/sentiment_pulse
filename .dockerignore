@@ -1,0 +1,7 @@
+**/__pycache__/
+**/*.pyc
+**/tests/
+api_crawler/tests/fixtures/
+.git/
+.venv/
+*.md

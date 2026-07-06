@@ -1,0 +1,46 @@
+# Kafka -> MinIO landing sink for the itviec topic.
+# Consumes sentiment-pulse.itviec and lands date-partitioned Parquet into the
+# raw bucket. No `sink:` block -> no ClickHouse DDL (this is the raw landing
+# zone; ClickHouse reads the Parquet later via the s3() table function).
+
+name: itviec_sink
+kind: streaming
+schema_file: data-contracts/schemas/raw/itviec.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: itviec-value
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.itviec
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+workload:
+  namespace: database
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: ["python", "-m", "api_crawler.sink"]
+  replicas: 1
+  sync_wave: "3"
+  port: null
+  # Plain env -> injected as UPPER_CASE (KAFKA_TOPIC comes from kafka.topic).
+  env:
+    minio_endpoint: http://minio.database.svc.cluster.local:9000
+    minio_raw_bucket: sentiment-pulse-raw
+    sink_prefix: itviec
+    batch_max_records: 500
+    batch_max_seconds: 60
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:                      # REQUIRED — pyarrow buffers a batch in RAM
+      cpu: "500m"
+      memory: "512Mi"
+  env_from_secrets:
+    - env_var: MINIO_ACCESS_KEY
+      secret_name: minio-credentials
+      secret_key: accessKey
+    - env_var: MINIO_SECRET_KEY
+      secret_name: minio-credentials
+      secret_key: secretKey

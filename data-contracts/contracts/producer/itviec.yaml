@@ -1,0 +1,35 @@
+name: itviec
+kind: producer
+schema_file: data-contracts/schemas/raw/itviec.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: itviec-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.itviec
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+sink:
+  clickhouse:
+    table: itviec
+    database: default
+
+# Per-source scraping knobs. sent-gen turns each key into an env var
+# (UPPER_CASE) on the generated DAG's pod; the crawler reads them via
+# api_crawler/jobs/itviec/config.py. This YAML is the single source of truth —
+# the crawler never parses it, it only reads the injected env.
+crawler:
+  listing_url: https://itviec.com/it-jobs
+  max_pages: 5
+  delay: 0.5
+
+airflow:
+  schedule: "0 2 * * *"
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.jobs.itviec"
+  resources:
+    cpu: "500m"
+    memory: "512Mi"

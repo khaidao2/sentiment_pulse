@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEFAULT CONTRACT — kind: streaming
+#
+# A "streaming" workload runs 24/7: it consumes from Kafka (or serves traffic)
+# and is deployed as a long-running Deployment (+ Service). Examples: a
+# Kafka -> ClickHouse sink, an NLP worker/server.
+#
+# Copy this file to contracts/streaming/<name>.yaml and fill in the values.
+# `sent-gen render` will generate, for each streaming contract:
+#   - platform-gitops/manifests/<name>.yaml    (Deployment + Service)
+#   - platform-gitops/apps/<name>.yaml         (ArgoCD Application)
+#   - generated/sql/<name>.sql                 (ClickHouse CREATE TABLE, if sink)
+#
+# NOTE (single 16GB node): every streaming workload holds RAM permanently.
+# `resources.limits` is REQUIRED — keep replicas at 1 and limits tight.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: default
+kind: streaming
+schema_file: data-contracts/schemas/raw/default.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: default-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.default
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+workload:
+  namespace: database
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: ["python", "-m", "api_crawler.sink"]
+  replicas: 1
+  sync_wave: "3"                 # ArgoCD ordering
+  # Optional HTTP port -> generates a Service when set.
+  port: null                     # e.g. 8080
+  # readiness_path: /health      # only used when port is set
+  # Optional plain env -> injected UPPER_CASE (KAFKA_TOPIC comes from kafka.topic).
+  # env:
+  #   minio_endpoint: http://minio.database.svc.cluster.local:9000
+  #   minio_raw_bucket: sentiment-pulse-raw
+  #   sink_prefix: default
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:                      # REQUIRED — caps RAM on the shared node
+      cpu: "500m"
+      memory: "512Mi"
+  env_from_secrets: []
+  #   - env_var: MINIO_ACCESS_KEY
+  #     secret_name: minio-credentials
+  #     secret_key: accessKey
+
+# Optional: present only when this streaming workload sinks into ClickHouse.
+sink:
+  clickhouse:
+    table: default
+    database: default

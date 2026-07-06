@@ -1,0 +1,173 @@
+{
+  "type": "record",
+  "name": "JobPosting",
+  "namespace": "com.itviec.jobs",
+  "doc": "Schema describing a job posting on ITViec (e.g. Senior Full-Stack Developer at Hello Vietnam Co., Ltd.).",
+  "fields": [
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Job title. E.g. 'Senior Full-Stack Developer (PHP, MySQL, Vue.js, API)'."
+    },
+    {
+      "name": "company_name",
+      "type": "string",
+      "doc": "Name of the hiring company."
+    },
+    {
+      "name": "company_url",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Link to the company page on ITViec. Null if not available."
+    },
+    {
+      "name": "salary_type",
+      "type": {
+        "type": "enum",
+        "name": "SalaryType",
+        "doc": "How the salary is expressed.",
+        "symbols": ["RANGE", "FIXED", "FROM", "UP_TO", "NEGOTIABLE"]
+      },
+      "default": "NEGOTIABLE",
+      "doc": "Salary disclosure type: RANGE = min-max, FIXED = single value, FROM = at least min, UP_TO = at most max, NEGOTIABLE = not disclosed. When NEGOTIABLE, the salary_*_usd fields are null."
+    },
+    {
+      "name": "salary_min_usd",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Minimum monthly salary in USD. Null if negotiable / not disclosed."
+    },
+    {
+      "name": "salary_max_usd",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Maximum monthly salary in USD. Null if negotiable / not disclosed."
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "default": "USD",
+      "doc": "Currency of the salary range. Defaults to 'USD'."
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "doc": "Work location / address."
+    },
+    {
+      "name": "work_arrangement",
+      "type": {
+        "type": "enum",
+        "name": "WorkArrangement",
+        "doc": "Work arrangement type.",
+        "symbols": ["AT_OFFICE", "REMOTE", "HYBRID"]
+      },
+      "doc": "Work arrangement: at the office, fully remote, or hybrid."
+    },
+    {
+      "name": "posted_days_ago",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Number of days since the posting was published. Null if unknown."
+    },
+    {
+      "name": "company_type",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Company type. E.g. 'IT Product', 'Outsourcing'."
+    },
+    {
+      "name": "company_industry",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Industry of the company. E.g. 'E-commerce'."
+    },
+    {
+      "name": "company_size",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Headcount range. E.g. '1-50 employees'."
+    },
+    {
+      "name": "country",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Country where the company is based. E.g. 'Vietnam'."
+    },
+    {
+      "name": "working_days",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Working days of the week. E.g. 'Monday - Friday'."
+    },
+    {
+      "name": "overtime_policy",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Overtime policy. E.g. 'No OT'."
+    },
+    {
+      "name": "min_years_experience",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Minimum years of experience required. E.g. 5."
+    },
+    {
+      "name": "job_domain",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Business domain of the role. E.g. 'FinTech', 'E-commerce'."
+    },
+    {
+      "name": "tech_stack",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of core technologies used. E.g. ['PHP 8.3 (Laravel)', 'MySQL', 'Vue.js', 'Docker', 'AWS']."
+    },
+    {
+      "name": "description",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "General overview of the product / project and the role."
+    },
+    {
+      "name": "responsibilities",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of job responsibilities; each element is one duty."
+    },
+    {
+      "name": "skills",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of required skills / qualifications; each element is one skill."
+    },
+    {
+      "name": "nice_to_have",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of preferred / bonus skills (not mandatory)."
+    },
+    {
+      "name": "benefits",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of benefits / perks offered to the candidate."
+    }
+  ]
+}

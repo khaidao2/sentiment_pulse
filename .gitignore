@@ -10,3 +10,6 @@ __pycache__/
 .pytest_cache/
 
 .claude
+
+# Local build notes (not part of the repo)
+data-contracts/docs/

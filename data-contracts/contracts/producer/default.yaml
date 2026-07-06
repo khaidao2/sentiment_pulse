@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DEFAULT CONTRACT — kind: producer
+#
+# A "producer" is a batch crawl that runs on a schedule, produces records to
+# Kafka, then exits (the pod is deleted afterwards). It has NO always-on
+# workload — it is driven by an Airflow DAG (KubernetesPodOperator).
+#
+# Copy this file to contracts/producer/<name>.yaml and fill in the values.
+# `sent-gen render` will generate, for each producer contract:
+#   - dags/<name>_dag.py                       (Airflow DAG)
+#   - generated/sql/<name>.sql                 (ClickHouse CREATE TABLE)
+#   - platform-gitops/apps/<name>.yaml         (ArgoCD Application, if needed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: default
+kind: producer
+schema_file: data-contracts/schemas/raw/default.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: default-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.default
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+# ClickHouse DDL is generated from the Avro schema above.
+sink:
+  clickhouse:
+    table: default
+    database: default
+
+airflow:
+  schedule: "0 2 * * *"          # cron; when the crawl runs
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.default.src"
+  # Keep tight — single 16GB node. Pod only lives during the crawl.
+  resources:
+    cpu: "500m"
+    memory: "512Mi"
+  # Optional: inject secrets as env vars into the crawl pod.
+  env_from_secrets: []
+  #   - env_var: SOME_API_KEY
+  #     secret_name: some-api-key
+  #     secret_key: apiKey

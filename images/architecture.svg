@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 300" font-family="ui-sans-serif,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1078" height="298" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="540" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">Sentiment Pulse — data plane (record's journey)</text>
+
+  <!-- A Websites -->
+  <rect x="24" y="96" width="150" height="84" rx="10" fill="#e0edff" stroke="#1d4ed8"/>
+  <text x="99" y="130" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">Websites</text>
+  <text x="99" y="150" text-anchor="middle" font-size="11" fill="#1e3a8a">itviec, vnexpress,</text>
+  <text x="99" y="165" text-anchor="middle" font-size="11" fill="#1e3a8a">chungsy…</text>
+
+  <!-- B Crawler -->
+  <rect x="204" y="96" width="168" height="84" rx="10" fill="#e0edff" stroke="#1d4ed8"/>
+  <text x="288" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">Crawler pod (producer)</text>
+  <text x="288" y="148" text-anchor="middle" font-size="11" fill="#1e3a8a">ISource → IParser</text>
+  <text x="288" y="163" text-anchor="middle" font-size="11" fill="#1e3a8a">→ IPublisher (Avro)</text>
+
+  <!-- C Kafka -->
+  <rect x="402" y="96" width="168" height="84" rx="10" fill="#fef3c7" stroke="#b45309"/>
+  <text x="486" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#92400e">Kafka / Redpanda</text>
+  <text x="486" y="148" text-anchor="middle" font-size="11" fill="#92400e">topic:</text>
+  <text x="486" y="163" text-anchor="middle" font-size="11" fill="#92400e">sentiment-pulse.itviec</text>
+
+  <!-- D Sink -->
+  <rect x="600" y="96" width="168" height="84" rx="10" fill="#e0edff" stroke="#1d4ed8"/>
+  <text x="684" y="128" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">Sink pod (consumer)</text>
+  <text x="684" y="148" text-anchor="middle" font-size="11" fill="#1e3a8a">ISubscriber → ISink</text>
+  <text x="684" y="163" text-anchor="middle" font-size="11" fill="#1e3a8a">batch → Parquet</text>
+
+  <!-- E MinIO -->
+  <rect x="798" y="96" width="118" height="84" rx="10" fill="#dcfce7" stroke="#15803d"/>
+  <text x="857" y="130" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">MinIO</text>
+  <text x="857" y="150" text-anchor="middle" font-size="11" fill="#166534">raw bucket</text>
+  <text x="857" y="165" text-anchor="middle" font-size="11" fill="#166534">parquet by date</text>
+
+  <!-- F ClickHouse -->
+  <rect x="946" y="96" width="110" height="84" rx="10" fill="#dcfce7" stroke="#15803d"/>
+  <text x="1001" y="130" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">ClickHouse</text>
+  <text x="1001" y="152" text-anchor="middle" font-size="11" fill="#166534">reads via s3()</text>
+
+  <!-- arrows -->
+  <line x1="174" y1="138" x2="202" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="188" y="128" text-anchor="middle" font-size="10" fill="#64748b">HTML</text>
+  <line x1="372" y1="138" x2="400" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="386" y="128" text-anchor="middle" font-size="10" fill="#64748b">produce</text>
+  <line x1="570" y1="138" x2="598" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="584" y="128" text-anchor="middle" font-size="10" fill="#64748b">consume</text>
+  <line x1="768" y1="138" x2="796" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="782" y="128" text-anchor="middle" font-size="10" fill="#64748b">put</text>
+  <line x1="916" y1="138" x2="944" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="930" y="128" text-anchor="middle" font-size="10" fill="#64748b">read</text>
+
+  <!-- schema registry -->
+  <rect x="402" y="222" width="168" height="52" rx="10" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="486" y="244" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">Apicurio (ccompat)</text>
+  <text x="486" y="262" text-anchor="middle" font-size="11" fill="#334155">Schema Registry · id=1</text>
+  <line x1="486" y1="222" x2="486" y2="181" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arw)"/>
+  <line x1="430" y1="222" x2="330" y2="181" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arw)"/>
+  <line x1="542" y1="222" x2="640" y2="181" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arw)"/>
+  <text x="486" y="292" text-anchor="middle" font-size="10" fill="#94a3b8">register on produce · fetch by id on consume (Confluent wire format)</text>
+</svg>
