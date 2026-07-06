@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: itviec-sink
-          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-46e9293
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-f3aeef9
           imagePullPolicy: Always
           command: ["python", "-m", "api_crawler.sink"]
           env:
