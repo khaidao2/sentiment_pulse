@@ -79,6 +79,7 @@ class ItviecParser(IParser):
             "job_url": job_url,
             "job_id": job_id,
             "crawled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "source": "itviec",
         }
         yield record
 

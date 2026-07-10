@@ -186,6 +186,12 @@
       "type": "string",
       "default": "",
       "doc": "ISO-8601 UTC timestamp (e.g. '2026-07-10T02:15:30Z') of when this page was crawled. Version column for downstream dedup: keep the latest crawled_at per job_id."
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "default": "itviec",
+      "doc": "Origin site of the posting. Defaults to 'itviec'; distinguishes sources once more crawlers land in the same tables."
     }
   ]
 }

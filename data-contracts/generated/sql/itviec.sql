@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS itviec (
     `benefits` Array(String),
     `job_url` Nullable(String),
     `job_id` Nullable(String),
-    `crawled_at` String
+    `crawled_at` String,
+    `source` String
 ) ENGINE = ReplacingMergeTree()
 ORDER BY job_id
 SETTINGS allow_nullable_key = 1;
