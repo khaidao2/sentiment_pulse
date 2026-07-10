@@ -43,6 +43,25 @@ def test_skills_extracted(record):
     assert record["skills"] != ["[Required]"]
 
 
+# ── natural key / dedup metadata ──────────────────────────────────────────
+def test_job_url_and_id(record):
+    import hashlib
+
+    assert record["job_url"] == (
+        "https://itviec.com/it-jobs/"
+        "network-engineer-cds-open-for-freshers-lg-cns-viet-nam-0956"
+    )
+    assert record["job_id"] == hashlib.sha256(record["job_url"].encode()).hexdigest()
+
+
+def test_crawled_at_is_iso_utc(record):
+    from datetime import datetime
+
+    # parses as UTC ISO-8601 and round-trips
+    dt = datetime.strptime(record["crawled_at"], "%Y-%m-%dT%H:%M:%SZ")
+    assert dt.year >= 2024
+
+
 # ── JSON-LD enrichment ────────────────────────────────────────────────────
 def test_jsonld_fields(record):
     assert record["company_industry"] == "Information Technology"

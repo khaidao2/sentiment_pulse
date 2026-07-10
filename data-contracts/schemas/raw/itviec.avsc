@@ -168,6 +168,24 @@
       },
       "default": [],
       "doc": "List of benefits / perks offered to the candidate."
+    },
+    {
+      "name": "job_url",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Canonical URL of the job detail page on ITViec — the natural key of a posting. Null only if the page exposed neither a canonical link nor og:url."
+    },
+    {
+      "name": "job_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "SHA-256 hex digest of job_url. Stable dedup key for the silver layer (one row per job_id, keep the row with the latest crawled_at). Null when job_url is null."
+    },
+    {
+      "name": "crawled_at",
+      "type": "string",
+      "default": "",
+      "doc": "ISO-8601 UTC timestamp (e.g. '2026-07-10T02:15:30Z') of when this page was crawled. Version column for downstream dedup: keep the latest crawled_at per job_id."
     }
   ]
 }

@@ -60,6 +60,12 @@ def clickhouse_type(avro_type) -> str:
     return _base_type(avro_type)
 
 
+# Natural-key candidates, in priority order. ReplacingMergeTree dedups rows that
+# share the ORDER BY key, so this MUST be the posting's identity — never tuple()
+# for a real table, or every row collapses into one on merge.
+_KEY_CANDIDATES = ("id", "job_id")
+
+
 def generate_ddl(schema: dict, table: str) -> str:
     """Render a ClickHouse CREATE TABLE from a parsed Avro schema.
 
@@ -71,12 +77,20 @@ def generate_ddl(schema: dict, table: str) -> str:
         f"    `{field['name']}` {clickhouse_type(field['type'])}"
         for field in schema["fields"]
     ]
-    has_id = any(field["name"] == "id" for field in schema["fields"])
-    order_by = "id" if has_id else "tuple()"
+    by_name = {field["name"]: field for field in schema["fields"]}
+    key = next((c for c in _KEY_CANDIDATES if c in by_name), None)
+    order_by = key or "tuple()"
+
+    # ClickHouse rejects a Nullable column in the sorting key unless this setting
+    # is on. job_id is Nullable (null when the page had no URL), so opt in.
+    settings = ""
+    if key and clickhouse_type(by_name[key]["type"]).startswith("Nullable("):
+        settings = "\nSETTINGS allow_nullable_key = 1"
+
     body = ",\n".join(columns)
     return (
         f"CREATE TABLE IF NOT EXISTS {table} (\n"
         f"{body}\n"
         f") ENGINE = ReplacingMergeTree()\n"
-        f"ORDER BY {order_by};\n"
+        f"ORDER BY {order_by}{settings};\n"
     )

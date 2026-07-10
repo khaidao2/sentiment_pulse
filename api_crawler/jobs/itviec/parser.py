@@ -12,9 +12,10 @@ saved-HTML fixture + a test that validates the record against that schema
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Iterable, Optional
 
 from bs4 import BeautifulSoup, Tag
@@ -42,6 +43,13 @@ class ItviecParser(IParser):
         # fields CSS scraping can't reliably reach.
         ld = self._jsonld(soup)
 
+        # Natural key of the posting. job_id = sha256(job_url) is the stable
+        # dedup key the silver layer groups on; crawled_at is its version column.
+        job_url = self._job_url(soup, ld)
+        job_id = (
+            hashlib.sha256(job_url.encode("utf-8")).hexdigest() if job_url else None
+        )
+
         record = {
             "title": title,
             "company_name": self._org_name(ld) or self._text(soup.select_one("h3")) or "",
@@ -68,6 +76,9 @@ class ItviecParser(IParser):
             "skills": self._section_items(soup, "Your skills and experience"),
             "nice_to_have": [],
             "benefits": self._section_items(soup, "Why you'll love working here"),
+            "job_url": job_url,
+            "job_id": job_id,
+            "crawled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         yield record
 
@@ -99,6 +110,23 @@ class ItviecParser(IParser):
             return (date.today() - date.fromisoformat(ds)).days if ds else None
         except (ValueError, TypeError):
             return None
+
+    def _job_url(self, soup: BeautifulSoup, ld: dict) -> Optional[str]:
+        """Canonical URL of this posting — the natural key.
+
+        Prefer <link rel="canonical">, then the og:url meta tag, then the
+        JSON-LD url. itviec serves og:url on every detail page even when the
+        canonical link is absent, so this is reliable enough to key on.
+        """
+        link = soup.find("link", rel="canonical")
+        url = link.get("href") if link else None
+        if not url:
+            og = soup.find("meta", attrs={"property": "og:url"})
+            url = og.get("content") if og else None
+        if not url:
+            u = ld.get("url")
+            url = u if isinstance(u, str) else None
+        return url.strip() if url else None
 
     def _min_years_experience(self, ld: dict) -> Optional[int]:
         exp = ld.get("experienceRequirements")
