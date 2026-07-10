@@ -1,0 +1,3 @@
+# dbt + the ClickHouse adapter. Pin the minor to avoid surprise breaks.
+dbt-core>=1.8,<1.10
+dbt-clickhouse>=1.8,<1.10

@@ -1,0 +1,21 @@
+# dbt project for the Sentiment Pulse warehouse (medallion on ClickHouse).
+#
+#   bronze_*  = raw MinIO Parquet, read in place via s3()   (views, no storage)
+#   silver_*  = cleaned + deduped, 1 row per job             (tables on ClickHouse)
+#   gold_*    = business marts for serving / reverse ETL     (tables on ClickHouse)
+#
+# Everything lives in one ClickHouse database ('default'); layers are told
+# apart by the model name prefix, not by separate schemas — simpler to start.
+name: "sentpul"
+version: "1.0.0"
+config-version: 2
+
+profile: "sentpul"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  sentpul:
+    # default for every model; individual models override with {{ config(...) }}
+    +materialized: view

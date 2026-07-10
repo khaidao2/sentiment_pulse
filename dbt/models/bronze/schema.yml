@@ -1,0 +1,41 @@
+# Tests + docs for the bronze layer.
+#
+# A dbt test is just a SELECT that returns the BAD rows. 0 rows back = PASS.
+# You declare "generic" tests (not_null, unique, accepted_values, ...) right
+# next to the column and dbt writes the SELECT for you.
+#
+# NOTE on bronze: this is the RAW layer — it intentionally keeps duplicates
+# (at-least-once + retries). So we do NOT test unique(job_id) here; that test
+# belongs on silver_current (the deduped layer) later.
+version: 2
+
+models:
+  - name: bronze_itviec
+    description: "Raw itviec postings read in place from MinIO Parquet via s3(). Keeps duplicates."
+    columns:
+      - name: title
+        description: "Job title."
+        data_tests:
+          - not_null
+
+      - name: company_name
+        description: "Hiring company."
+        data_tests:
+          - not_null
+
+      - name: crawled_at
+        description: "ISO-8601 UTC time the page was crawled. Version column for dedup."
+        data_tests:
+          - not_null
+
+      - name: salary_type
+        description: "How salary is expressed."
+        data_tests:
+          - accepted_values:
+              values: ["RANGE", "FIXED", "FROM", "UP_TO", "NEGOTIABLE"]
+
+      - name: work_arrangement
+        description: "Work arrangement."
+        data_tests:
+          - accepted_values:
+              values: ["AT_OFFICE", "REMOTE", "HYBRID"]

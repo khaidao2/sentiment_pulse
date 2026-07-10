@@ -1,0 +1,32 @@
+# Tests for the silver layer.
+#
+# Contrast with bronze: silver_current is the DEDUPED layer, so uniqueness is
+# now a real contract — job_id MUST be unique here. If this test ever fails,
+# the dedup logic (LIMIT 1 BY) is broken. This is the test that actually guards
+# the "one row per job" promise.
+version: 2
+
+models:
+  - name: silver_history
+    description: "Cleaned postings, one row per (job, distinct content version). Keeps history."
+    columns:
+      - name: job_id
+        description: "SHA-256 of job_url; the posting's natural key (non-null here)."
+        data_tests:
+          - not_null
+      - name: content_hash
+        description: "Fingerprint of content fields; a new value = the posting changed."
+        data_tests:
+          - not_null
+
+  - name: silver_current
+    description: "Latest crawl per job_id — current state for serving / reverse ETL."
+    columns:
+      - name: job_id
+        description: "Natural key. Unique in this layer by construction."
+        data_tests:
+          - not_null
+          - unique
+      - name: crawled_at
+        data_tests:
+          - not_null
