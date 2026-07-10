@@ -10,7 +10,8 @@
 {{ config(
     materialized="table",
     engine="MergeTree",
-    order_by="job_id"
+    order_by="job_id",
+    settings={"allow_nullable_key": 1}
 ) }}
 
 select *

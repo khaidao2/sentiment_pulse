@@ -13,7 +13,8 @@
     materialized="incremental",
     engine="ReplacingMergeTree",
     order_by="(job_id, content_hash)",
-    incremental_strategy="append"
+    incremental_strategy="append",
+    settings={"allow_nullable_key": 1}
 ) }}
 
 select
