@@ -8,10 +8,24 @@ fallbacks for running locally against Redpanda + a local MinIO.
 """
 
 import os
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # ── which topic to archive ───────────────────────────────────────────────
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "sentiment-pulse.itviec")
 KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", f"{KAFKA_TOPIC}-minio-sink")
+
+# Avro schema for this topic — the single source of truth for the Parquet column
+# types the sink writes. Ships at a fixed path inside the image (same file the
+# producer serializes with). Default is itviec's; a second topic overrides via
+# the SCHEMA_PATH env (sent-gen should inject it from the contract then).
+SCHEMA_PATH = Path(
+    os.environ.get(
+        "SCHEMA_PATH",
+        _REPO_ROOT / "data-contracts" / "schemas" / "raw" / "itviec.avsc",
+    )
+)
 
 # ── MinIO / S3 target ─────────────────────────────────────────────────────
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://localhost:9000")

@@ -4,8 +4,9 @@ Layout on the bucket:
     s3://<bucket>/<prefix>/dt=YYYY-MM-DD/part-<ts>-<uuid>.parquet
 
 Parquet is columnar and compresses well, so ClickHouse can read it back with the
-s3() table function. The Arrow schema is inferred from the record dicts, so any
-source works without extra wiring. Flush happens by record count or age,
+s3() table function. An explicit Arrow `schema` (derived from the Avro schema by
+the composition root) keeps column types stable even when a batch is all-null;
+without one, types are inferred per batch. Flush happens by record count or age,
 whichever comes first; partitioning uses the ingest date (UTC).
 
 This is an ISink adapter — that port is the seam. To add another store (GCS,
@@ -40,6 +41,7 @@ class MinioSink(ISink):
         prefix: str,
         max_records: int = 500,
         max_seconds: float = 60.0,
+        schema: pa.Schema | None = None,
     ) -> None:
         secure = endpoint.startswith("https://")
         host = endpoint.split("://", 1)[-1].rstrip("/")
@@ -48,6 +50,7 @@ class MinioSink(ISink):
         self._prefix = prefix.strip("/")
         self._max_records = max_records
         self._max_seconds = max_seconds
+        self._schema = schema
         self._buffer: list[dict] = []
         self._last_flush = time.monotonic()
 
@@ -76,7 +79,7 @@ class MinioSink(ISink):
         records, self._buffer = self._buffer, []
         self._last_flush = time.monotonic()
 
-        table = pa.Table.from_pylist(records)
+        table = pa.Table.from_pylist(records, schema=self._schema)
         buf = io.BytesIO()
         pq.write_table(table, buf, compression="snappy")
         payload = buf.getvalue()
