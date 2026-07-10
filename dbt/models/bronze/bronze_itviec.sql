@@ -15,3 +15,6 @@ from s3(
     '{{ env_var("MINIO_SECRET_KEY") }}',
     'Parquet'
 )
+-- union the schema across all files so a new column (e.g. source) added to newer
+-- Parquet doesn't break the read against older files (missing cols -> null).
+settings schema_inference_mode = 'union'
