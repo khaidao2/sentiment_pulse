@@ -1,0 +1,83 @@
+# Dedicated Postgres for the web app — the reverse-ETL target. Separate from the
+# Airflow metadata Postgres on purpose (different owner, lifecycle, backup). The
+# web app owns the schema/migrations; reverse ETL only UPSERTs into `jobs`.
+#
+# Credentials are NOT here — they live in SealedSecrets you generate with
+# kubeseal (safe to commit, decrypted in-cluster by the sealed-secrets
+# controller):
+#   webapp-postgres-sealed-db.yaml   -> Secret webapp-postgres-credentials (ns webapp)
+#   webapp-postgres-sealed-dsn.yaml  -> Secret webapp-postgres-credentials (ns airflow, key dsn)
+# The Application globs webapp-postgres*.yaml so those files sync alongside this.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webapp-postgres-pvc
+  namespace: webapp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-postgres
+  namespace: webapp
+  labels:
+    app: webapp-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp-postgres
+  strategy:
+    type: Recreate          # single RWO volume — never two pods at once
+  template:
+    metadata:
+      labels:
+        app: webapp-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: webapp-postgres-credentials   # from the SealedSecret
+          env:
+            # keep data in a subdir so a fresh volume's lost+found doesn't block initdb
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: webapp-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-postgres
+  namespace: webapp
+spec:
+  selector:
+    app: webapp-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
