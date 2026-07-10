@@ -1,0 +1,15 @@
+# SealedSecret -> Secret webapp-postgres-credentials (key `dsn`) in ns airflow,
+# so the reverse_etl_itviec DAG's pod can mount the Postgres DSN. Same credentials
+# as the webapp-ns secret, sealed for the airflow namespace.
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: webapp-postgres-credentials
+  namespace: airflow
+spec:
+  encryptedData:
+    dsn: AgB/Xz5RMohLBqyStLQxj5gUhCpk+T1R6XenNX9gZC9jc6mgA/mERfc9+yT64S38rP1eMVcKGN3ebhP1zagBiuFZqFjT7J7EVUImTHeoLAtAYXdLIDpTJlEmHvRAjGnh3tM8wG79Tk9aTM0XyvIh7KJsGXg/5WOPyzT7oMWawy8NKDSpIeoVMWfAUwpRpwy7Z+rq94Y1GmLWXF2EDJ85XlboI+oB9qdAlIuzO4P6c20XS84jkjgkKjGPhiWajyW0SfI7gLs8hub6aaxazLrs+ZoKP/Ti5+mUjhyQYqi6/FLev4Kx3me7wvRuImfItdHQ1mSzfdT+iD9uKMMqko499mUT0iCFL9R8FRNpG7GkgvCI/Xrqk4zM/IHYRZXz9sjf8M2Dea1pv8pZ4JM3LNUPSO07o8F55IwQfvCYngAh5DKEjr8+s0EulmrTlIjKYgPBRmLH8UUji+ZHf5XpeBdsMqvczJS3f7mB5dFGp9kOZUL2ICos/L5gCg4QLk5ig4aUKzrplPdqpxQVVk7igOXXCKn6C6XH37BEWXDTFjDcEdIojA4xbp4hRFZUoxV0U9EbcKrmfLyHwhkKyRIG4wvLSjNH/t09yuz+0kURd5H2+y9CTIgqOHBybNnV6gSmQN3yUwJgBVMxPW1GmTjXWt4vqB1s5o39wDp6Y3R53dYcfEcmoQcNZpLYvRLvYmL88gieV3SaR3wPpkkK4tdfM6sribB61a8wdD++AKc849ElpR44711Bs6eJWxE7RpOvmCy7szaf7ZbuCQhQznD+CCFKKw2K4zzc55sx05YjNcf0wwM=
+  template:
+    metadata:
+      name: webapp-postgres-credentials
+      namespace: airflow
