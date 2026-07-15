@@ -2,9 +2,8 @@
 # so the reverse_etl_itviec DAG's pod can mount the Postgres DSN. Same credentials
 # as the webapp-ns secret, sealed for the airflow namespace.
 #
-# DSN is in libpq keyword form (not a URL) on purpose: the password contains an
-# `@`, which breaks URL parsing (psycopg reads the host as `@webapp-postgres...`).
-# Keyword form has no special chars to escape.
+# DSN is in libpq keyword form (not a URL): psycopg.connect() takes it directly,
+# and it sidesteps URL percent-encoding of special chars in the password.
 apiVersion: bitnami.com/v1alpha1
 kind: SealedSecret
 metadata:
@@ -12,7 +11,7 @@ metadata:
   namespace: airflow
 spec:
   encryptedData:
-    dsn: AgCOt5pJIuq74pq5OX9GWT5N3kEnUGtmbOPqa222M94T6i9YU+My8jd9h3o7hbFAo20dd6vGArrc/ZeZ36yaMabJ816bX/UFL8uQcuPb+m9lOHF2kh/nhKSoC3ZhPrLv9ts6hB/FRjhOfVIAUN443sWduNZkMpbfCWt/4jqqAElbWNSFoR/JVfvx/G//dKlMHWHjUxrAzOEuGMY/wop9jquhnhNS2P1NaYgBREVOTk7U8agdTG8eNVk8zlTJAQNiNtLoDQMF3q2mDusSf1OKqNMw2KqoG6CLKgAzJH1m/miTRNa3+44pWpDWZH/kv9uex6Eza8VGa+q93L6cABk+9OB70kCYaSTyoZAbTUAYd7pggD7dOUCWBqQxMpk4axaLEVDkZOs9XfoyRGbtN7yAMDZnjfjblL4M664iDFdRJp7RCdcEUgtid5Akta/nAAjnfTKMigMEDz7i+oPNhaq6iyNkQvjWUN6H2K9IgFpbtDc4lwym8Gf+3SfazqGly3dX/COkhaT8WsJxTMBFXzAuRJxDrOa+g3gRdcO+ozjO9Jmy3NPthAeFSE5wX6VFHifzfzCbqjwOM1xD5TAnNzjBrTjyXaI9dK8ORXFjYeTkTrjoyaEHOCn4infsYvQxv6qdb08X67C/lpgwtkVgyRepYyj6rPgzqlCYdUBHUFlRNW1CBHfaXyxWQUptF2N8LHDr9WxfvJPtdNQEHymsmqSSqYpDcnO2JhPuRH778WclNB+tx1bNen/q16r57yqexyte7ai7ZovthK82repl66Km79R7niSm/tEQWoyA1NTJIg9tcqMRQh6ay3E49Ntuuoyd0O4=
+    dsn: AgCG1XOBNeinlIrmTm/doahsqa7oGvjNVZ4tZ5HQbDO8fehBVicmv8okwC7i34ajub61+yfi7GC4jP8aRFS9T6ip+cFucG8JpZhu7wnrp5+VbrM+rfCI3cAJ+eKwKxXJMG8MExlMoOrTx+x9YpE6RmIA2YcjPShDP5YrACVdLLwAhPEKpYxEQ0aqo2gUdpvZLObGTqB0glUChUerBGPabzD+XCXOxucLu/5EA8VjoqeZxvsNd9M+vO3nEbFB4RzevfNCz82epWZqkR+ks9KRi8X62vbYfvKwM69mPUWV2usW36thdLK/iyQpVFBb90FdKGrY1ITlKZRErqzDcCRM+dpiK0TmvNDyBVN+LMqRc0pKc5L0pVlmR4kB80H+uplr/sHtHrr51UPKH5wfdvbBVBrXIQ4k5IH2+47dS5aBjAilRJl0GVxvfzE4OklNsJX0g/KL4iCZ78Onu67UH3HWfuhi8VFmYQOuryBxWAoesD2ci27J6kKpNScBP8rp0wyWWXjoAtFV8roNqIY5MRqBMI6kGNq95mZlmE7TmFH6bQmwQ2J4NZYoRWCqkf73NUQpK2R5agiznLmqHvm1beZ56UWLiE3vviB4FXaip4hB3wVs7Pu4qHW2aPxwSAGgZ3mk2Sc0In9WcK5ZhT00PG90bPf53MUdDNXZmTuI24sdyUY14FGJt+4BXRmBOdE4yA2epdkcr66MRl/AuQLCffAevfkO2Sikwegv2FTasQI8BdfVh66cWTqGEqK8qfISgV/MpYKG3QifSze8VHxqUGPBh+TcZFyPbr6Q8oonr95szRTSMHvby6utMsAfg5pP45fQ5froN1IXC7wUbuGAirFYmsVW0lJoCXjhYwNNTU2k7gf6bnoxkUqz
   template:
     metadata:
       name: webapp-postgres-credentials
