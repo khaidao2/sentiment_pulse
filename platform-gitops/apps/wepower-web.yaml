@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wepower-web
+  namespace: argocd
+  annotations:
+    # After webapp-postgres (wave 0) — the app is useless without its database.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'wepower-web*.yaml'   # deployment/service + its SealedSecret
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: webapp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

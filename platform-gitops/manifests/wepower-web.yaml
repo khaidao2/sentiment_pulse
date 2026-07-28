@@ -1,0 +1,89 @@
+# WEPOWER HUB web app (Next.js) — repo github.com/khaidao2/wepowerhub-clone.
+#
+# Shares webapp-postgres with the Sentiment Pulse web app but owns the separate
+# `wepower` schema; both projects have a `users` and a `companies`, so the two
+# never share a table. Schema changes go through that repo's dbmate migrations
+# (db/migrations), the same mechanism sentiment_pulse_web uses — never a
+# hand-run ALTER, and never an automatic migration on pod start.
+#
+# Credentials are NOT here — they come from the SealedSecret in
+# wepower-web-sealed-secrets.yaml, which the Application globs in alongside
+# this file:
+#   Secret wepower-web-secrets (ns webapp): DATABASE_URL, AUTH_SECRET,
+#   EMAIL_WEBHOOK_SECRET
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wepower-web
+  namespace: webapp
+  labels:
+    app: wepower-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wepower-web
+  template:
+    metadata:
+      labels:
+        app: wepower-web
+    spec:
+      containers:
+        - name: web
+          # Built by .github/workflows/build-image.yml in the app repo.
+          image: ghcr.io/khaidao2/wepowerhub-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - secretRef:
+                name: wepower-web-secrets
+          env:
+            # Public origin. Email tracking pixels and click links are built
+            # from this, so it has to be what a recipient's mail client can
+            # reach — not the in-cluster service name.
+            - name: APP_URL
+              value: https://wepower.sentpul.click
+            - name: NODE_ENV
+              value: production
+          # /api/v1/ping is the unauthenticated liveness route: the app's auth
+          # proxy excludes it deliberately, so probes need no credentials.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ping
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/ping
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # Next writes its cache under .next
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wepower-web
+  namespace: webapp
+spec:
+  selector:
+    app: wepower-web
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http

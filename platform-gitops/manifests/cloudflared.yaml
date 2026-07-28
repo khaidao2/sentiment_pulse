@@ -24,6 +24,12 @@ data:
         service: http://minio.database:9000
       - hostname: cloudbeaver.sentpul.click
         service: http://oauth2-proxy-cloudbeaver.database:80
+      # WEPOWER HUB web app. No oauth2-proxy in front of this one: it has its
+      # own JWT login and its own tenants, and a second gate would break the
+      # email tracking pixel and the delivery webhook, which are fetched by
+      # mail clients and mail providers that carry no session.
+      - hostname: wepower.sentpul.click
+        service: http://wepower-web.webapp:80
       - service: http_status:404
 ---
 apiVersion: apps/v1
