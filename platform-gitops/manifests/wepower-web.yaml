@@ -29,6 +29,23 @@ spec:
       labels:
         app: wepower-web
     spec:
+      # Pinned to the control-plane node, where cloudflared and Postgres also
+      # run.
+      #
+      # Not a capacity decision — pod-to-pod traffic between nodes does not
+      # work on this cluster. One machine has registered itself three times
+      # under three hostnames (192.168.1.4, 192.168.1.5, fedora), each handed
+      # its own pod subnet, so the routes on `khaibaai` point three ways at one
+      # host. The web pod happened to share a node with cloudflared for its
+      # first nine days and nobody noticed; the first restart that rescheduled
+      # it elsewhere took the site down with `no route to host` while the pod
+      # itself was healthy.
+      #
+      # This pins the symptom shut. The cluster still needs the duplicate node
+      # objects removed and flannel restarted before anything here may span
+      # nodes.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
       containers:
         - name: web
           # Built by .github/workflows/build-image.yml in the app repo.
