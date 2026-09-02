@@ -1,0 +1,151 @@
+# CronJob của WEPOWER HUB — bản gốc nằm ở repo ứng dụng (deploy/cron.yaml,
+# github.com/khaidao2/wepowerhub-clone) và được chép sang đây để ArgoCD quản.
+#
+# Vì sao phải chép: ArgoCD đọc manifest từ repo NÀY, không đọc repo ứng dụng.
+# Trước 01/09 ba CronJob này được `kubectl apply` thẳng vào cluster, nên chúng
+# chạy nhưng không ai quản — không nằm trong git, không hiện trong ArgoCD, và
+# một lần dựng lại cluster là mất sạch mà không có gì nhắc.
+#
+# Chúng không bị `prune` xoá trong thời gian đó chỉ vì ArgoCD chưa từng sở hữu
+# chúng; prune chỉ dọn thứ nó từng quản. Sau khi file này vào git thì ArgoCD
+# nhận quản, và từ đó sửa lịch phải sửa ở ĐÂY — sửa bằng kubectl sẽ bị đồng bộ
+# ngược lại vì Application bật selfHeal.
+#
+# Khoá CRON_SECRET lấy từ SealedSecret wepower-web-secrets, không đặt ở đây.
+---
+# Cron workers for AI CRM. Three jobs:
+#   - workflow-runs:        resumes WAITING workflow runs whose WAIT is over
+#   - scheduled-campaigns:  sends email campaigns whose send_at is due
+#   - google-sheet-sync:    runs due CRM ↔ Google Sheet syncs
+# All hit the web pod and authenticate with the shared CRON_SECRET, which
+# lives in the wepower-web-secrets Secret (set as a runtime secret, not in
+# this manifest). Same image, same env as the web pod so the routes run in
+# an identical environment.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wepower-workflow-runs
+  labels: { app: wepower-cron }
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: cron
+              image: ghcr.io/khaidao2/wepowerhub-web:latest
+              command: ["node"]
+              args:
+                - "-e"
+                - "(async()=>{const{APP_URL,CRON_SECRET}=process.env;const u=APP_URL.replace(/\\/$/,'')+'/api/cron/workflow-runs';const r=await fetch(u,{method:'POST',headers:{'x-cron-secret':CRON_SECRET}});const b=await r.text();console.log('[cron-workflow-runs]',r.status,b);if(!r.ok)process.exit(1);})().catch(e=>{console.error(e);process.exit(1);});"
+              env:
+                - name: APP_URL
+                  value: "https://wepower.sentpul.click"
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: wepower-web-secrets
+                      key: CRON_SECRET
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wepower-scheduled-campaigns
+  labels: { app: wepower-cron }
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: cron
+              image: ghcr.io/khaidao2/wepowerhub-web:latest
+              command: ["node"]
+              args:
+                - "-e"
+                - "(async()=>{const{APP_URL,CRON_SECRET}=process.env;const u=APP_URL.replace(/\\/$/,'')+'/api/cron/scheduled-campaigns';const r=await fetch(u,{method:'POST',headers:{'x-cron-secret':CRON_SECRET}});const b=await r.text();console.log('[cron-scheduled-campaigns]',r.status,b);if(!r.ok)process.exit(1);})().catch(e=>{console.error(e);process.exit(1);});"
+              env:
+                - name: APP_URL
+                  value: "https://wepower.sentpul.click"
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: wepower-web-secrets
+                      key: CRON_SECRET
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+---
+# Google Sheet sync. Every five minutes is enough: the finest cadence a tenant
+# can pick is hourly, and `isSyncDue` — not this schedule — decides whether a
+# given connection actually runs.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wepower-google-sheet-sync
+  labels: { app: wepower-cron }
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: cron
+              image: ghcr.io/khaidao2/wepowerhub-web:latest
+              command: ["node"]
+              args:
+                - "-e"
+                - "(async()=>{const{APP_URL,CRON_SECRET}=process.env;const u=APP_URL.replace(/\\/$/,'')+'/api/cron/google-sheet-sync';const r=await fetch(u,{method:'POST',headers:{'x-cron-secret':CRON_SECRET}});const b=await r.text();console.log('[cron-google-sheet-sync]',r.status,b);if(!r.ok)process.exit(1);})().catch(e=>{console.error(e);process.exit(1);});"
+              env:
+                - name: APP_URL
+                  value: "https://wepower.sentpul.click"
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: wepower-web-secrets
+                      key: CRON_SECRET
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
