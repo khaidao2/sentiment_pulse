@@ -12,7 +12,14 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: webapp-postgres-pvc
+  # Tên MỚI từ 05/09/2026. PVC cũ (webapp-postgres-pvc) dùng storageClass
+  # local-path, nghĩa là khối dữ liệu nằm trên ĐĨA CỦA khaibaai — nó không đi
+  # theo pod sang node khác được, và một PVC đã Bound vào PV trên khaibaai sẽ
+  # giữ pod ở trạng thái Pending vĩnh viễn khi pod bị ghim sang fedora-1.
+  #
+  # PVC cũ KHÔNG bị xoá: dữ liệu production cũ vẫn nằm nguyên trên đĩa
+  # khaibaai, dump lại được nếu sau này cần.
+  name: webapp-postgres-pvc-fedora1
   namespace: webapp
 spec:
   accessModes:
@@ -41,6 +48,9 @@ spec:
       labels:
         app: webapp-postgres
     spec:
+      # Cùng node với web và cloudflared — xem ghi chú trong wepower-web.yaml.
+      nodeSelector:
+        kubernetes.io/hostname: fedora-1
       containers:
         - name: postgres
           image: postgres:16
@@ -67,7 +77,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: webapp-postgres-pvc
+            claimName: webapp-postgres-pvc-fedora1
 ---
 apiVersion: v1
 kind: Service

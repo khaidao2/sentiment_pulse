@@ -28,8 +28,12 @@ data:
       # own JWT login and its own tenants, and a second gate would break the
       # email tracking pixel and the delivery webhook, which are fetched by
       # mail clients and mail providers that carry no session.
+      # Trỏ thẳng vào IP node fedora-1 qua NodePort, không dùng ClusterIP
+      # `wepower-web.webapp:80` như trước: từ 05/09/2026 pod web nằm ở
+      # fedora-1 còn cloudflared ở lại node cũ, mà mạng pod giữa hai node
+      # không thông. Địa chỉ Tailscale được chọn vì nó không đổi theo DHCP.
       - hostname: wepower.sentpul.click
-        service: http://wepower-web.webapp:80
+        service: http://100.113.76.119:30080
       - service: http_status:404
 ---
 apiVersion: apps/v1
