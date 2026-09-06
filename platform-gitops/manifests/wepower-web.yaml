@@ -63,6 +63,11 @@ spec:
               value: https://wepower.sentpul.click
             - name: NODE_ENV
               value: production
+            # Múi giờ hiển thị. Không đặt thì tiến trình chạy UTC và mọi mốc
+            # thời gian trên giao diện lệch 7 tiếng — máy lập trình viên chạy
+            # Asia/Saigon nên lỗi này không bao giờ lộ ra lúc phát triển.
+            - name: TZ
+              value: Asia/Ho_Chi_Minh
           # /api/v1/ping is the unauthenticated liveness route: the app's auth
           # proxy excludes it deliberately, so probes need no credentials.
           readinessProbe:
