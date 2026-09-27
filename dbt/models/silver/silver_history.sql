@@ -40,6 +40,10 @@ from {{ ref("bronze_itviec") }}
 where job_id is not null
 
 {% if is_incremental() %}
-    -- only the new slice: rows crawled after the newest one we've already stored
-    and crawled_at > (select max(crawled_at) from {{ this }})
+    -- only the new slice, with a 1-day look-back: a batch the sink flushes
+    -- after this model last ran can carry crawled_at older than the current
+    -- max, and a strict `>` would skip it forever. Re-read overlap rows have the
+    -- same (job_id, content_hash) and ReplacingMergeTree collapses them.
+    and parseDateTimeBestEffortOrNull(crawled_at) >
+        (select parseDateTimeBestEffort(max(crawled_at)) - interval 1 day from {{ this }})
 {% endif %}

@@ -114,7 +114,9 @@ def main() -> None:
     )
     result = ch.query(
         f"SELECT {', '.join(SELECT_COLS)} FROM silver_current "
-        "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s)",
+        # 1-day look-back: rows that reach silver after a later-stamped row was
+        # already synced are still picked up. The upsert makes the overlap free.
+        "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s) - INTERVAL 1 DAY",
         parameters={"wm": watermark.isoformat()},
     )
     rows = [dict(zip(result.column_names, r)) for r in result.result_rows]

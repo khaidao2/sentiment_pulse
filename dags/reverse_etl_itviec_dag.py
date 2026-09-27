@@ -6,7 +6,8 @@
 #
 # Runs in the `airflow` namespace. Postgres connection comes from the
 # `webapp-postgres-credentials` secret (key `dsn`), created when the web's
-# Postgres is deployed. ClickHouse creds are plain (non-secret).
+# Postgres is deployed. The ClickHouse password comes from the
+# `clickhouse-credentials` secret (key `password`) — see transform_itviec_dag.py.
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -46,7 +47,12 @@ with DAG(
         ),
         env_vars=[
             k8s.V1EnvVar(name="CLICKHOUSE_HOST", value="clickhouse.database.svc.cluster.local"),
-            k8s.V1EnvVar(name="CLICKHOUSE_PASSWORD", value="clickhousepassword"),
+            k8s.V1EnvVar(
+                name="CLICKHOUSE_PASSWORD",
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(name="clickhouse-credentials", key="password")
+                ),
+            ),
             k8s.V1EnvVar(
                 name="POSTGRES_DSN",
                 value_from=k8s.V1EnvVarSource(

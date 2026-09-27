@@ -9,7 +9,9 @@
 #
 # Runs in the `airflow` namespace (same as the crawler pods). MinIO credentials
 # come from the `minio-credentials` secret, which must exist in THIS namespace
-# (copy it from `database` once). ClickHouse creds are plain (non-secret).
+# (copy it from `database` once). The ClickHouse password comes from the
+# `clickhouse-credentials` secret (key `password`), created once with:
+#   kubectl -n airflow create secret generic clickhouse-credentials --from-literal=password=...
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -49,7 +51,12 @@ with DAG(
         ),
         env_vars=[
             k8s.V1EnvVar(name="CLICKHOUSE_HOST", value="clickhouse.database.svc.cluster.local"),
-            k8s.V1EnvVar(name="CLICKHOUSE_PASSWORD", value="clickhousepassword"),
+            k8s.V1EnvVar(
+                name="CLICKHOUSE_PASSWORD",
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(name="clickhouse-credentials", key="password")
+                ),
+            ),
             k8s.V1EnvVar(
                 name="MINIO_ACCESS_KEY",
                 value_from=k8s.V1EnvVarSource(
