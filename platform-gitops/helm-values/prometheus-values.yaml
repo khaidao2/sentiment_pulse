@@ -4,10 +4,10 @@ server:
   resources:
     limits:
       cpu: 500m
-      memory: 1024Mi
+      memory: 3Gi
     requests:
       cpu: 200m
-      memory: 512Mi
+      memory: 1Gi
   persistentVolume:
     size: 5Gi
 
