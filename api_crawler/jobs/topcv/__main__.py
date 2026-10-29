@@ -30,6 +30,7 @@ def main() -> None:
         listing_url=config.LISTING_URL,
         max_pages=config.MAX_PAGES,
         delay=config.DELAY,
+        max_retries=config.MAX_RETRIES,
     )
     parser = TopcvParser(vnd_per_usd=config.VND_PER_USD)
     publisher = AvroKafkaProducer(

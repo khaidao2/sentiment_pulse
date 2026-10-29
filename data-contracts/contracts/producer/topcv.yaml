@@ -25,7 +25,12 @@ crawler:
   max_pages: 25         # safety ceiling only; the crawl stops when a listing
                         # page has no job cards (crawl-everything). The IT
                         # category runs ~30-40 pages of 50 jobs; raise if needed.
-  delay: 1.5            # TopCV 403s a fast detail walk — keep this >= 1.5s
+  delay: 4.0            # TopCV throttles hard. At 1.5s a real run took 403 on
+                        # listing pages and 429 on most details and published 47
+                        # of ~250 listed jobs; compare careerviet 410, itviec
+                        # 1119 the same day. Do not lower this.
+  max_retries: 3        # retries honour Retry-After, then exponential backoff.
+                        # Recovery only — pace is what stops the throttling.
   vnd_per_usd: 25000    # TopCV quotes salaries in VND; the parser converts to
                         # the contract's USD salary fields at this rate. Bump it
                         # when the rate moves — no code change needed.

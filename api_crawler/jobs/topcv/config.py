@@ -17,7 +17,11 @@ LISTING_URL = os.environ.get(
     "LISTING_URL", "https://www.topcv.vn/tim-viec-lam-cong-nghe-thong-tin-cr257"
 )
 MAX_PAGES = int(os.environ.get("MAX_PAGES", "10"))
-DELAY = float(os.environ.get("DELAY", "1.5"))  # seconds between detail fetches
+# TopCV throttles hard: a run at 1.5s took 403 on listing pages and 429 on most
+# details, publishing 47 of ~250 listed jobs. Pace is the real fix; MAX_RETRIES
+# only recovers the ones that still slip through.
+DELAY = float(os.environ.get("DELAY", "4.0"))  # seconds between every fetch
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
 # TopCV quotes salaries in VND; the contract's salary fields are USD, so the
 # parser converts at this rate. Contract-fed so it can be refreshed without a
 # code change.

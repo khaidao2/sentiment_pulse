@@ -20,6 +20,7 @@ Env:
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 
 import clickhouse_connect
 import psycopg
@@ -104,6 +105,22 @@ def main() -> None:
         cur.execute("SELECT coalesce(max(crawled_at), '1970-01-01Z') FROM jobs")
         watermark = cur.fetchone()[0]
 
+    # 1-day look-back: rows that reach silver after a later-stamped row was
+    # already synced are still picked up; the upsert makes the overlap free.
+    #
+    # The subtraction happens HERE, not in ClickHouse, and is floored at the
+    # epoch. ClickHouse DateTime is an unsigned 32-bit epoch and cannot hold a
+    # pre-1970 value, so `parseDateTimeBestEffort('1970-01-01Z') - INTERVAL 1
+    # DAY` does not clamp — it WRAPS to 2106-02-06. On an empty target the
+    # watermark is exactly that epoch sentinel, so the predicate became
+    # `crawled_at > 2106` and matched nothing: the job printed "nothing newer",
+    # exited 0, and Airflow recorded success while writing zero rows. A cold
+    # first sync could never happen. Verified against the live table: with the
+    # look-back 0 rows, without it 1046.
+    _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    wm = watermark if watermark.tzinfo else watermark.replace(tzinfo=timezone.utc)
+    lower_bound = max(wm - timedelta(days=1), _EPOCH)
+
     # 2. pull only the changed slice from ClickHouse. crawled_at is a String in
     #    ClickHouse; parse both sides so format never bites us.
     ch = clickhouse_connect.get_client(
@@ -114,15 +131,13 @@ def main() -> None:
     )
     result = ch.query(
         f"SELECT {', '.join(SELECT_COLS)} FROM silver_current "
-        # 1-day look-back: rows that reach silver after a later-stamped row was
-        # already synced are still picked up. The upsert makes the overlap free.
-        "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s) - INTERVAL 1 DAY",
-        parameters={"wm": watermark.isoformat()},
+        "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s)",
+        parameters={"wm": lower_bound.isoformat()},
     )
     rows = [dict(zip(result.column_names, r)) for r in result.result_rows]
 
     if not rows:
-        print(f"reverse-etl: nothing newer than {watermark.isoformat()}")
+        print(f"reverse-etl: nothing newer than {lower_bound.isoformat()}")
         return
 
     # 3. per-job UPSERT into the normalized target, all in one transaction.
