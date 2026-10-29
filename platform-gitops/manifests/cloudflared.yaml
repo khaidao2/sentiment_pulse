@@ -24,6 +24,12 @@ data:
         service: http://minio.database:9000
       - hostname: cloudbeaver.sentpul.click
         service: http://oauth2-proxy-cloudbeaver.database:80
+      # Sentiment Pulse web app. Hostname reused from the removed WEPOWER HUB so
+      # no new Cloudflare DNS record is needed. ClusterIP, not NodePort: the
+      # cross-node pod networking that forced NodePort before was fixed
+      # 2026-10-29 (firewalld forward reject + stale flannel VXLAN peers).
+      - hostname: wepower.sentpul.click
+        service: http://sentiment-pulse-web.webapp:80
       - service: http_status:404
 ---
 apiVersion: apps/v1

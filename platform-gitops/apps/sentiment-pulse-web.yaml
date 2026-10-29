@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sentiment-pulse-web
+  namespace: argocd
+  annotations:
+    # After webapp-postgres (wave 0) — the app is useless without its database.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    # Deleting this Application must delete the workload with it. Without this,
+    # removing the Application only drops ArgoCD's ownership and leaves the
+    # Deployment/Service running, unmanaged — exactly what happened when
+    # wepower-web was removed on 2026-10-29 and had to be cleaned up by hand.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'sentiment-pulse-web*.yaml'   # deployment/service + its SealedSecret
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: webapp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,94 @@
+# Sentiment Pulse web app — FastAPI API + the built frontend in one image.
+#
+# Credentials are NOT here. Two sources:
+#   * webapp-postgres-credentials (existing SealedSecret) gives POSTGRES_USER /
+#     POSTGRES_PASSWORD / POSTGRES_DB; DATABASE_URL is composed from them below
+#     with $(VAR) interpolation, so the DSN is never duplicated in a second
+#     secret that could drift from the database's own.
+#   * sentiment-pulse-web-secrets (SealedSecret you generate with kubeseal, see
+#     the header of sentiment-pulse-web-sealed-secrets.yaml) gives JWT_SECRET.
+#
+# The image is PRIVATE on ghcr.io, unlike sentiment-pulse-crawler which is
+# public and therefore needs no pull secret. Hence imagePullSecrets: ghcr-pull.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-pulse-web
+  namespace: webapp
+  labels:
+    app: sentiment-pulse-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-pulse-web
+  template:
+    metadata:
+      labels:
+        app: sentiment-pulse-web
+    spec:
+      # No nodeSelector on purpose. wepower-web had to be pinned (and cloudflared
+      # reached it by NodePort) because pod traffic between the two nodes did not
+      # flow; that was firewalld rejecting forward plus stale flannel VXLAN peers,
+      # both fixed 2026-10-29. ClusterIP works from either node now.
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: web
+          image: ghcr.io/khaidao2/sentiment-pulse-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - secretRef:
+                name: webapp-postgres-credentials
+          env:
+            # Composed, not stored: $(VAR) refers to the envFrom keys above.
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@webapp-postgres.webapp.svc.cluster.local:5432/$(POSTGRES_DB)
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sentiment-pulse-web-secrets
+                  key: JWT_SECRET
+          # connection.py raises if DATABASE_URL is unset rather than falling back
+          # to localhost, so a bad env fails the probe instead of serving wrong data.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-pulse-web
+  namespace: webapp
+spec:
+  type: ClusterIP
+  selector:
+    app: sentiment-pulse-web
+  ports:
+    - port: 80
+      targetPort: 8000
+      name: http
