@@ -48,7 +48,9 @@ spec:
       labels:
         app: webapp-postgres
     spec:
-      # Cùng node với web và cloudflared — xem ghi chú trong wepower-web.yaml.
+      # Ghim vào `fedora` vì PVC dùng storageClass local-path: khối dữ liệu nằm
+      # trên đĩa của node, không đi theo pod sang node khác được. (Ghi chú cũ trỏ
+      # tới wepower-web.yaml — app đó đã bị xoá khỏi repo.)
       nodeSelector:
         kubernetes.io/hostname: fedora
       containers:
