@@ -1,0 +1,252 @@
+{
+  "type": "record",
+  "name": "JobPosting",
+  "namespace": "com.careerviet.jobs",
+  "doc": "Schema describing a job posting on CareerViet (e.g. Kỹ Sư AI và Dữ Liệu at CÔNG TY CỔ PHẦN THỜI TRANG H VÀ A). Field-for-field identical to the itviec schema so bronze/silver models and the reverse ETL can union both sources.",
+  "fields": [
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Job title. E.g. 'Kỹ Sư AI và Dữ Liệu (AI & Data Engineer)'."
+    },
+    {
+      "name": "company_name",
+      "type": "string",
+      "doc": "Name of the hiring company."
+    },
+    {
+      "name": "company_url",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Link to the company page on CareerViet. Null if not available."
+    },
+    {
+      "name": "salary_type",
+      "type": {
+        "type": "enum",
+        "name": "SalaryType",
+        "doc": "How the salary is expressed.",
+        "symbols": [
+          "RANGE",
+          "FIXED",
+          "FROM",
+          "UP_TO",
+          "NEGOTIABLE"
+        ]
+      },
+      "default": "NEGOTIABLE",
+      "doc": "Salary disclosure type: RANGE = min-max, FIXED = single value, FROM = at least min, UP_TO = at most max, NEGOTIABLE = not disclosed. When NEGOTIABLE, the salary_*_usd fields are null."
+    },
+    {
+      "name": "salary_min_usd",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Minimum monthly salary in USD. CareerViet quotes VND; the crawler converts at crawler.vnd_per_usd. Null if negotiable / not disclosed."
+    },
+    {
+      "name": "salary_max_usd",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Maximum monthly salary in USD. CareerViet quotes VND; the crawler converts at crawler.vnd_per_usd. Null if negotiable / not disclosed."
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "default": "USD",
+      "doc": "Currency of the salary range. Always 'USD' — VND amounts are converted by the crawler so sources stay comparable."
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "doc": "Work location — the city, e.g. 'Hồ Chí Minh'."
+    },
+    {
+      "name": "work_arrangement",
+      "type": {
+        "type": "enum",
+        "name": "WorkArrangement",
+        "doc": "Work arrangement type.",
+        "symbols": [
+          "AT_OFFICE",
+          "REMOTE",
+          "HYBRID"
+        ]
+      },
+      "doc": "Work arrangement: at the office, fully remote, or hybrid."
+    },
+    {
+      "name": "posted_days_ago",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Number of days since the posting was published. Null if unknown."
+    },
+    {
+      "name": "company_type",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Company type. E.g. 'IT Product', 'Outsourcing'."
+    },
+    {
+      "name": "company_industry",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Industry / job categories of the posting. E.g. 'CNTT - Phần mềm, Bảo trì / Sửa chữa'."
+    },
+    {
+      "name": "company_size",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Headcount range. E.g. '1-50 employees'."
+    },
+    {
+      "name": "country",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Country where the company is based. E.g. 'Vietnam'."
+    },
+    {
+      "name": "working_days",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Working days of the week. E.g. 'Monday - Friday'."
+    },
+    {
+      "name": "overtime_policy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Overtime policy. E.g. 'No OT'."
+    },
+    {
+      "name": "min_years_experience",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Minimum years of experience required. E.g. 5."
+    },
+    {
+      "name": "job_domain",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Business domain of the role. E.g. 'FinTech', 'E-commerce'."
+    },
+    {
+      "name": "tech_stack",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "CareerViet's 'Job tags / skills' tags. E.g. ['Data Engineer', 'AI']."
+    },
+    {
+      "name": "description",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Text of the 'Mô tả Công việc' (job description) section."
+    },
+    {
+      "name": "responsibilities",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Bullet lines of the 'Mô tả Công việc' section; each element is one duty."
+    },
+    {
+      "name": "skills",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Bullet lines of the 'Yêu Cầu Công Việc' (requirements) section; each element is one requirement."
+    },
+    {
+      "name": "nice_to_have",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of preferred / bonus skills (not mandatory)."
+    },
+    {
+      "name": "benefits",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "The 'Phúc lợi' welfare list. E.g. ['Chế độ bảo hiểm', 'Du Lịch']."
+    },
+    {
+      "name": "job_url",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Canonical URL of the job detail page on CareerViet (https://careerviet.vn/vi/tim-viec-lam/<slug>.<JOB_ID>.html) — the natural key of a posting. Null only if the page exposed neither a canonical link nor og:url."
+    },
+    {
+      "name": "job_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "SHA-256 hex digest of job_url. Stable dedup key for the silver layer (one row per job_id, keep the row with the latest crawled_at). Null when job_url is null."
+    },
+    {
+      "name": "crawled_at",
+      "type": "string",
+      "default": "",
+      "doc": "ISO-8601 UTC timestamp (e.g. '2026-07-10T02:15:30Z') of when this page was crawled. Version column for downstream dedup: keep the latest crawled_at per job_id."
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "default": "careerviet",
+      "doc": "Origin site of the posting. Always 'careerviet' for this topic."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+name: careerviet
+kind: producer
+schema_file: data-contracts/schemas/raw/careerviet.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: careerviet-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.careerviet
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+sink:
+  clickhouse:
+    table: careerviet
+    database: default
+
+# Per-source scraping knobs. sent-gen turns each key into an env var
+# (UPPER_CASE) on the generated DAG's pod; the crawler reads them via
+# api_crawler/jobs/careerviet/config.py. This YAML is the single source of
+# truth — the crawler never parses it, it only reads the injected env.
+crawler:
+  # IT / software category listing ("CNTT - Phần mềm", c1). Paging appends
+  # `-trang-N` before the locale suffix; the source builds that.
+  listing_url: https://careerviet.vn/viec-lam/cntt-phan-mem-c1-vi.html
+  max_pages: 40         # safety ceiling only; the crawl stops when a listing
+                        # page yields no new jobs (crawl-everything). CareerViet
+                        # serves 50 cards/page, so ~40 pages covers the category.
+  delay: 1.0            # CareerViet has no Cloudflare challenge but is slower
+                        # than itviec — 1s between detail fetches stays polite.
+  vnd_per_usd: 25000    # CareerViet quotes salaries in VND; the parser converts
+                        # to the contract's USD salary fields at this rate, so
+                        # every source's salary_*_usd means the same thing.
+
+airflow:
+  schedule: "0 3 * * *"
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.jobs.careerviet"
+  resources:
+    cpu: "500m"
+    memory: "512Mi"

@@ -36,7 +36,7 @@ select
         arrayStringConcat(responsibilities, '|'),
         arrayStringConcat(benefits, '|')
     ) as content_hash
-from {{ ref("bronze_itviec") }}
+from {{ ref("bronze_all_sources") }}
 where job_id is not null
 
 {% if is_incremental() %}

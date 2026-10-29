@@ -18,7 +18,11 @@ kafka:
 
 workload:
   namespace: database
-  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  # Pinned, not :latest. The generated manifest had been hand-edited to this
+  # digest-tag; a plain `sent-gen render` would have reverted it to :latest and
+  # restarted the running sink with a different build. The pin belongs here, in
+  # the contract, so regeneration is idempotent (config flows one way).
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-e5f06ad
   command: ["python", "-m", "api_crawler.sink"]
   replicas: 1
   sync_wave: "3"

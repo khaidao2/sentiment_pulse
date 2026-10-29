@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS topcv (
+    `title` String,
+    `company_name` String,
+    `company_url` Nullable(String),
+    `salary_type` String,
+    `salary_min_usd` Nullable(Int32),
+    `salary_max_usd` Nullable(Int32),
+    `currency` String,
+    `location` String,
+    `work_arrangement` String,
+    `posted_days_ago` Nullable(Int32),
+    `company_type` Nullable(String),
+    `company_industry` Nullable(String),
+    `company_size` Nullable(String),
+    `country` Nullable(String),
+    `working_days` Nullable(String),
+    `overtime_policy` Nullable(String),
+    `min_years_experience` Nullable(Int32),
+    `job_domain` Nullable(String),
+    `tech_stack` Array(String),
+    `description` Nullable(String),
+    `responsibilities` Array(String),
+    `skills` Array(String),
+    `nice_to_have` Array(String),
+    `benefits` Array(String),
+    `job_url` Nullable(String),
+    `job_id` Nullable(String),
+    `crawled_at` String,
+    `source` String
+) ENGINE = ReplacingMergeTree()
+ORDER BY job_id
+SETTINGS allow_nullable_key = 1;

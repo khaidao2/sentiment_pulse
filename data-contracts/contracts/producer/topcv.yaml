@@ -1,0 +1,40 @@
+name: topcv
+kind: producer
+schema_file: data-contracts/schemas/raw/topcv.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: topcv-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.topcv
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+sink:
+  clickhouse:
+    table: topcv
+    database: default
+
+# Per-source scraping knobs. sent-gen turns each key into an env var
+# (UPPER_CASE) on the generated DAG's pod; the crawler reads them via
+# api_crawler/jobs/topcv/config.py. This YAML is the single source of truth —
+# the crawler never parses it, it only reads the injected env.
+crawler:
+  listing_url: https://www.topcv.vn/tim-viec-lam-cong-nghe-thong-tin-cr257
+  max_pages: 25         # safety ceiling only; the crawl stops when a listing
+                        # page has no job cards (crawl-everything). The IT
+                        # category runs ~30-40 pages of 50 jobs; raise if needed.
+  delay: 1.5            # TopCV 403s a fast detail walk — keep this >= 1.5s
+  vnd_per_usd: 25000    # TopCV quotes salaries in VND; the parser converts to
+                        # the contract's USD salary fields at this rate. Bump it
+                        # when the rate moves — no code change needed.
+
+airflow:
+  schedule: "30 2 * * *"         # 30min after itviec so the two don't overlap
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.jobs.topcv"
+  resources:
+    cpu: "500m"
+    memory: "512Mi"
