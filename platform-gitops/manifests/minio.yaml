@@ -54,8 +54,13 @@ spec:
               value: "minioadmin"
             - name: MINIO_ROOT_PASSWORD
               value: "minioadminpassword"
+            # Public URL, not the in-cluster Service: MinIO runs on node `fedora`
+            # and Keycloak on `khaibaai`, and the pod network between the two
+            # nodes does not carry traffic (see wepower-web.yaml). MinIO BLOCKS
+            # startup until OpenID initialises, so an unreachable issuer here
+            # means it never opens :9000/:9001 at all -> 502 at the tunnel.
             - name: MINIO_IDENTITY_OPENID_CONFIG_URL
-              value: "http://keycloak.keycloak:80/realms/data-platform/.well-known/openid-configuration"
+              value: "https://auth.sentpul.click/realms/data-platform/.well-known/openid-configuration"
             - name: MINIO_IDENTITY_OPENID_CLIENT_ID
               value: "minio"
             - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
