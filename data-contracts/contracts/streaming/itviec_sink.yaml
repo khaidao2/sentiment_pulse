@@ -18,11 +18,15 @@ kafka:
 
 workload:
   namespace: database
-  # Pinned, not :latest. The generated manifest had been hand-edited to this
-  # digest-tag; a plain `sent-gen render` would have reverted it to :latest and
-  # restarted the running sink with a different build. The pin belongs here, in
-  # the contract, so regeneration is idempotent (config flows one way).
-  image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-e5f06ad
+  # Stays :latest ON PURPOSE. The sha- pin in the generated manifest is owned by
+  # CI, not by this contract: build-image.yml seds the immutable tag into
+  # platform-gitops/manifests/itviec_sink.yaml after each image build, and its
+  # own comment spells out the cycle — `sent-gen render` resets the manifest to
+  # :latest, the next build re-pins it, and it converges.
+  #
+  # Pinning a sha here breaks that: a render would emit whatever sha this file
+  # happens to name, which goes stale the moment CI builds again.
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
   command: ["python", "-m", "api_crawler.sink"]
   replicas: 1
   sync_wave: "3"
