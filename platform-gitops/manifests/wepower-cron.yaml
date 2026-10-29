@@ -39,7 +39,7 @@ spec:
           # Cùng node với Postgres — cron gọi thẳng database, mà mạng pod
           # giữa các node của cụm này không thông.
           nodeSelector:
-            kubernetes.io/hostname: fedora-1
+            kubernetes.io/hostname: fedora
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
@@ -85,7 +85,7 @@ spec:
           # Cùng node với Postgres — cron gọi thẳng database, mà mạng pod
           # giữa các node của cụm này không thông.
           nodeSelector:
-            kubernetes.io/hostname: fedora-1
+            kubernetes.io/hostname: fedora
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
@@ -134,7 +134,7 @@ spec:
           # Cùng node với Postgres — cron gọi thẳng database, mà mạng pod
           # giữa các node của cụm này không thông.
           nodeSelector:
-            kubernetes.io/hostname: fedora-1
+            kubernetes.io/hostname: fedora
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true

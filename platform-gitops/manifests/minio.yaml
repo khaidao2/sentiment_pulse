@@ -20,6 +20,8 @@ metadata:
     app: minio
 spec:
   replicas: 1
+  strategy:
+    type: Recreate          # single RWO volume — never two pods at once
   selector:
     matchLabels:
       app: minio
@@ -28,9 +30,14 @@ spec:
       labels:
         app: minio
     spec:
+      securityContext:
+        fsGroup: 65532
       containers:
         - name: minio
-          image: minio/minio:latest
+          # minio/minio on Docker Hub is no longer anonymously pullable
+          # (insufficient_scope); quay.io/minio/minio is gated too. Chainguard
+          # ships the upstream MinIO binary, so the command/env below are unchanged.
+          image: chainguard/minio:latest
           command:
             - minio
             - server

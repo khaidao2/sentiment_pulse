@@ -43,7 +43,7 @@ spec:
       # Cả hai được ghim theo trong cùng lần sửa này — chuyển mỗi web thì web
       # sống mà không ai gọi tới được, và nó không gọi được database.
       nodeSelector:
-        kubernetes.io/hostname: fedora-1
+        kubernetes.io/hostname: fedora
       containers:
         - name: web
           # Built by .github/workflows/build-image.yml in the app repo.

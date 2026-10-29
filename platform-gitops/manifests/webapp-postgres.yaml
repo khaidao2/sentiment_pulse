@@ -50,7 +50,7 @@ spec:
     spec:
       # Cùng node với web và cloudflared — xem ghi chú trong wepower-web.yaml.
       nodeSelector:
-        kubernetes.io/hostname: fedora-1
+        kubernetes.io/hostname: fedora
       containers:
         - name: postgres
           image: postgres:16
