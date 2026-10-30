@@ -136,6 +136,21 @@ CANONICAL: dict[str, list[str]] = {
     "Information Security": ["infosec"],
 }
 
+# ── canonical professional skills ───────────────────────────────────────────
+# Real, searchable capabilities that are not technologies. Held in their own map
+# so the technical/professional split is recorded in the data rather than in a
+# reader's head. Both kinds are stored in the same `skills` table today, because
+# the web schema has one lookup and no `kind` column — persisting the
+# distinction would be a schema change, so it is deliberately NOT made here.
+# `kind()` below is what a future migration would read.
+PROFESSIONAL: dict[str, list[str]] = {
+    "Project Management": ["project mgmt", "quản lý dự án"],
+    "Team Management": ["team mgmt", "people management", "quản lý nhóm"],
+    "Leadership": ["team leadership", "lãnh đạo"],
+    "Stakeholder Management": ["stakeholder mgmt", "stakeholder engagement"],
+}
+
+
 # ── excluded: job roles ──────────────────────────────────────────────────────
 # A role is what someone IS, not what they can do. The posting already carries
 # it in `title`; duplicating it as a skill makes "Backend Developer" look like a
@@ -195,3 +210,15 @@ GENERIC: set[str] = {
 }
 
 EXCLUDED: set[str] = ROLES | LANGUAGES | GENERIC
+
+#: every stored skill, whichever kind
+ALL_SKILLS: dict[str, list[str]] = {**CANONICAL, **PROFESSIONAL}
+
+
+def kind(canonical: str) -> str:
+    """"technical" | "professional" — the split the schema cannot hold yet."""
+    if canonical in PROFESSIONAL:
+        return "professional"
+    if canonical in CANONICAL:
+        return "technical"
+    raise KeyError(canonical)

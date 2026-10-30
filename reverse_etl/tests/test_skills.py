@@ -132,12 +132,40 @@ def test_normalize_is_stable_under_repetition():
     assert once == normalize(once) == "postgresql"
 
 
+# professional skills — stored, but a distinct class from technologies
+@pytest.mark.parametrize("raw, canonical", [
+    ("Project Management", "Project Management"), ("project mgmt", "Project Management"),
+    ("quản lý dự án", "Project Management"), ("Team Management", "Team Management"),
+    ("people management", "Team Management"), ("Leadership", "Leadership"),
+    ("lãnh đạo", "Leadership"), ("Stakeholder Management", "Stakeholder Management"),
+])
+def test_professional_skills_are_recognised(raw, canonical):
+    assert match_exact(raw) == canonical
+
+
+def test_professional_and_technical_are_distinguishable():
+    from skills.dictionary import kind
+    assert kind("Project Management") == "professional"
+    assert kind("Python") == "technical"
+
+
+def test_professional_skill_extracted_from_prose():
+    got = extract_skills(description="Strong leadership and stakeholder management across teams")
+    assert set(got) == {"Leadership", "Stakeholder Management"}
+
+
+def test_adding_professional_skills_did_not_admit_roles_or_languages():
+    """The four additions must not have widened the exclusions by accident."""
+    for v in ["Project Manager", "Manager", "English", "Backend Developer"]:
+        assert match_exact(v) is None
+
+
 def test_every_alias_resolves_to_a_canonical_name():
-    from skills.dictionary import CANONICAL
-    assert set(LOOKUP.values()) <= set(CANONICAL)
+    from skills.dictionary import ALL_SKILLS
+    assert set(LOOKUP.values()) <= set(ALL_SKILLS)
 
 
 def test_no_canonical_name_is_also_excluded():
     """A term cannot be both a skill and an exclusion — that would be ambiguous."""
-    from skills.dictionary import CANONICAL, EXCLUDED
-    assert not {normalize(c) for c in CANONICAL} & EXCLUDED
+    from skills.dictionary import ALL_SKILLS, EXCLUDED
+    assert not {normalize(c) for c in ALL_SKILLS} & EXCLUDED

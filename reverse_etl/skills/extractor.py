@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from .dictionary import CANONICAL, EXCLUDED
+from .dictionary import ALL_SKILLS, EXCLUDED
 
 # Terms too short or too common to scan for inside prose. "Go" matches the verb,
 # "C" matches an initial, "ML" matches a unit. They are still recognised when a
@@ -57,7 +57,7 @@ def normalize(value: str | None) -> str:
 def _build_lookup() -> dict[str, str]:
     """{normalised term: canonical display name} for every name and alias."""
     table: dict[str, str] = {}
-    for canonical, aliases in CANONICAL.items():
+    for canonical, aliases in ALL_SKILLS.items():
         for term in (canonical, *aliases):
             key = normalize(term)
             if key:
