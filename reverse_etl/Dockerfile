@@ -9,6 +9,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY sync_jobs.py .
+# the skill dictionary + extractor; without this the image still imports
+# `skills` and dies at startup
+COPY skills/ ./skills/
 
 RUN useradd --create-home etl && chown -R etl /app
 USER etl

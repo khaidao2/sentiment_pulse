@@ -25,6 +25,8 @@ from datetime import datetime, timedelta, timezone
 import clickhouse_connect
 import psycopg
 
+from skills import extract_skills
+
 # Scalar job attributes (columns on the jobs table, minus company_id/updated_at).
 JOB_COLS = [
     "job_id", "job_url", "title", "salary_type", "salary_min_usd",
@@ -52,6 +54,8 @@ SELECT_COLS = JOB_COLS + COMPANY_COLS + list(ARRAY_COLS)
 # the value itself.
 MAX_LOOKUP_BYTES = 2000
 _skipped_lookups = []
+# [raw requirement bullets seen, canonical skills kept]
+_extraction_stats = [0, 0]
 
 
 def _upsert_lookup(cur, table, col, id_col, value):
@@ -167,9 +171,28 @@ def main() -> None:
             )
             _upsert_job(cur, row, company_id)
             for arr_col, (ltbl, lid, jtbl, jfk) in ARRAY_COLS.items():
-                _sync_junction(cur, row["job_id"], row[arr_col], ltbl, lid, jtbl, jfk)
+                values = row[arr_col]
+                if arr_col == "skills":
+                    # `skills` off the crawler is NOT a skills list — every
+                    # parser fills it with the requirements section's bullets,
+                    # so its values are sentences, section headers and even
+                    # recruitment copy. Storing them as lookup rows is what put
+                    # 13495 rows averaging 104 bytes in this table. Read them as
+                    # text to scan instead, and keep only dictionary matches.
+                    values = extract_skills(
+                        tech_stack=row.get("tech_stack"),
+                        description=row.get("description"),
+                        requirements=row.get("skills"),
+                    )
+                    _extraction_stats[0] += len(row.get("skills") or [])
+                    _extraction_stats[1] += len(values)
+                _sync_junction(cur, row["job_id"], values, ltbl, lid, jtbl, jfk)
     pg.commit()
     print(f"reverse-etl: upserted {len(rows)} job(s) (watermark {watermark.isoformat()})")
+    print(
+        f"reverse-etl: skills — {_extraction_stats[0]} requirement bullet(s) read, "
+        f"{_extraction_stats[1]} canonical skill(s) stored (dictionary matches only)"
+    )
     if _skipped_lookups:
         worst = max(size for _, size in _skipped_lookups)
         tables = sorted({t for t, _ in _skipped_lookups})
