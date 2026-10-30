@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: careerviet-sink
-          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-a42dbb2
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-cd6d300
           imagePullPolicy: Always
           command: ["python", "-m", "api_crawler.sink"]
           env:
