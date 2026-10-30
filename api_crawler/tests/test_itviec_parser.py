@@ -68,3 +68,20 @@ def test_jsonld_fields(record):
     assert record["country"] == "VN"
     assert record["min_years_experience"] == 0          # 10 months // 12
     assert isinstance(record["posted_days_ago"], int) and record["posted_days_ago"] >= 0
+
+
+def test_description_covers_the_whole_section_not_just_the_first_block(record):
+    """Regression: `description` used to read only h.find_next_sibling().
+
+    itviec renders most descriptions as a bullet list, so the first sibling was
+    an intro line or nothing and the body landed in `responsibilities` instead.
+    Live index before the fix: median description 198 chars vs 868 of
+    responsibilities, 231 jobs thin-description/fat-responsibilities.
+    """
+    desc = record["description"] or ""
+    joined = "\n".join(record["responsibilities"])
+    assert len(desc) > 400, "description truncated to the first block again"
+    # Every bullet the section yields must appear in the section text.
+    for item in record["responsibilities"]:
+        assert item in desc, f"missing from description: {item[:60]!r}"
+    assert len(desc) >= len(joined)

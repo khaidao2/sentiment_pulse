@@ -152,8 +152,36 @@ class ItviecParser(IParser):
         return h.find_next_sibling() if h else None
 
     def _section_text(self, soup: BeautifulSoup, heading: str) -> Optional[str]:
-        body = self._section_body(soup, heading)
-        return self._text(body)
+        """Whole section, not just its first block.
+
+        A section holds several sibling blocks — an intro <p>, a <ul>, another
+        <p> — exactly as _section_items documents. Reading only
+        `h.find_next_sibling()` meant that when itviec renders the description
+        as a bullet list (most postings) the text captured was the intro line or
+        nothing: measured over the live index, itviec's median description was
+        198 characters against 868 of responsibilities, with 231 jobs holding a
+        description under 200 while their responsibilities exceeded 400.
+        careerviet and topcv were unaffected because they read a single JSON-LD
+        blob.
+
+        That also starved the skill extractor, which scans `description` as free
+        text, on the largest source.
+
+        Walks the same way _section_items does: every top-level block between
+        this heading and the next <h2>. Blocks are joined with newlines so the
+        bullet structure survives into the stored text.
+        """
+        h = self._heading(soup, heading)
+        if h is None:
+            return None
+        parts: list[str] = []
+        for el in h.find_next_siblings():
+            if el.name == "h2":
+                break
+            text = el.get_text("\n", strip=True) if hasattr(el, "get_text") else None
+            if text:
+                parts.append(text)
+        return "\n".join(parts) or None
 
     def _section_items(self, soup: BeautifulSoup, heading: str) -> list[str]:
         # A section can hold several sibling blocks (e.g. "[Required]" <p>, a
