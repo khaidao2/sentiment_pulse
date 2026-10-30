@@ -33,7 +33,16 @@ JOB_COLS = [
     "salary_max_usd", "currency", "location", "work_arrangement",
     "posted_days_ago", "min_years_experience", "description",
     "crawled_at", "source",
+    # The posting's own prose, as text[]. Sentences, not labels — they are not
+    # minted as lookup rows, which is what polluted `skills`.
+    "responsibilities", "requirements", "nice_to_have",
 ]
+# Postgres column -> ClickHouse column, where the two disagree. ClickHouse calls
+# the requirement bullets `skills` because the crawlers scrape them from the
+# requirements section; that name is wrong and caused the skills pollution, so
+# the target column is `requirements` and the mapping is explicit here rather
+# than renaming a pipeline column everything else already reads.
+SOURCE_COL = {"requirements": "skills"}
 # Company attributes, deduped into the companies table on `name`.
 COMPANY_COLS = ["company_name", "company_url", "company_industry", "country"]
 # Array attribute -> (lookup table, its id col, junction table, its fk col).
@@ -42,7 +51,15 @@ ARRAY_COLS = {
     "skills": ("skills", "skill_id", "job_skills", "skill_id"),
     "benefits": ("benefits", "benefit_id", "job_benefits", "benefit_id"),
 }
-SELECT_COLS = JOB_COLS + COMPANY_COLS + list(ARRAY_COLS)
+# What to ask ClickHouse for: job columns under their SOURCE names, plus the
+# company and array columns. dict.fromkeys dedupes while keeping order —
+# `skills` is both the source of `requirements` and an ARRAY_COLS key, and
+# selecting it twice is a syntax error.
+SELECT_COLS = list(
+    dict.fromkeys(
+        [SOURCE_COL.get(c, c) for c in JOB_COLS] + COMPANY_COLS + list(ARRAY_COLS)
+    )
+)
 
 
 # Postgres cannot index a btree row wider than 2704 bytes, and every lookup
@@ -93,7 +110,7 @@ def _upsert_company(cur, name, url, industry, country):
 
 def _upsert_job(cur, row, company_id):
     cols = ["company_id"] + JOB_COLS
-    vals = [company_id] + [row[c] for c in JOB_COLS]
+    vals = [company_id] + [row[SOURCE_COL.get(c, c)] for c in JOB_COLS]
     updatable = [c for c in cols if c != "job_id"]
     cur.execute(
         f"INSERT INTO jobs ({', '.join(cols)}) "
