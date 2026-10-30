@@ -31,6 +31,12 @@ with DAG(
         in_cluster=True,
         get_logs=True,
         on_finish_action="delete_pod",
+        # A cold image pull on a node that has never seen this image routinely
+        # exceeds KPO's 120s default and fails the task before the container
+        # starts (seen four times on 2026-10-29/30: dbt_build, sync_jobs and two
+        # crawls, each succeeding on the retry once the layers were local). The
+        # pull is not the problem; the default budget is.
+        startup_timeout_seconds=600,
         container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "50m", "memory": "128Mi"},
             limits={"cpu": "500m", "memory": "512Mi"},
@@ -40,7 +46,8 @@ with DAG(
             k8s.V1EnvVar(name="KAFKA_BOOTSTRAP_SERVERS", value="kafka.kafka.svc.cluster.local:9092"),
             k8s.V1EnvVar(name="LISTING_URL", value="https://www.topcv.vn/tim-viec-lam-cong-nghe-thong-tin-cr257"),
             k8s.V1EnvVar(name="MAX_PAGES", value="25"),
-            k8s.V1EnvVar(name="DELAY", value="1.5"),
+            k8s.V1EnvVar(name="DELAY", value="4.0"),
+            k8s.V1EnvVar(name="MAX_RETRIES", value="3"),
             k8s.V1EnvVar(name="VND_PER_USD", value="25000"),
         ],
     )

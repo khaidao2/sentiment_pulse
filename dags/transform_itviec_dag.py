@@ -45,6 +45,12 @@ with DAG(
         in_cluster=True,
         get_logs=True,
         on_finish_action="delete_pod",
+        # A cold image pull on a node that has never seen this image routinely
+        # exceeds KPO's 120s default and fails the task before the container
+        # starts (seen four times on 2026-10-29/30: dbt_build, sync_jobs and two
+        # crawls, each succeeding on the retry once the layers were local). The
+        # pull is not the problem; the default budget is.
+        startup_timeout_seconds=600,
         container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "100m", "memory": "256Mi"},
             limits={"cpu": "1000m", "memory": "1Gi"},

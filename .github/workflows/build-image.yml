@@ -65,15 +65,24 @@ jobs:
       # on :latest (a fresh pod pulls it each run, so no pin needed there).
       # NOTE: this edits a sent-gen-generated file; re-running `sent-gen render`
       # resets it to :latest, and the next image build re-pins it — it converges.
-      - name: Pin sink image to this SHA (ArgoCD auto-rollout)
+      - name: Pin sink images to this SHA (ArgoCD auto-rollout)
         run: |
-          FILE=platform-gitops/manifests/itviec_sink.yaml
-          sed -i -E "s|(ghcr\.io/khaidao2/sentiment-pulse-crawler):[A-Za-z0-9._-]+|\1:sha-${{ steps.tags.outputs.sha }}|g" "$FILE"
-          if git diff --quiet -- "$FILE"; then
-            echo "sink image already current"; exit 0
+          # EVERY sink, not just itviec. All sinks run the same crawler image, so
+          # a source added later (topcv, careerviet, ...) must be pinned too —
+          # an unpinned :latest never changes the manifest, so ArgoCD sees
+          # nothing to roll out and that sink keeps running old code until some
+          # unrelated restart happens to repull.
+          FILES=$(ls platform-gitops/manifests/*_sink.yaml 2>/dev/null || true)
+          if [ -z "$FILES" ]; then echo "no sink manifests"; exit 0; fi
+          # shellcheck disable=SC2086
+          sed -i -E "s|(ghcr\.io/khaidao2/sentiment-pulse-crawler):[A-Za-z0-9._-]+|\1:sha-${{ steps.tags.outputs.sha }}|g" $FILES
+          # shellcheck disable=SC2086
+          if git diff --quiet -- $FILES; then
+            echo "sink images already current"; exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$FILE"
-          git commit -m "chore(cd): pin itviec-sink to sha-${{ steps.tags.outputs.sha }} [skip ci]"
+          # shellcheck disable=SC2086
+          git add $FILES
+          git commit -m "chore(cd): pin sinks to sha-${{ steps.tags.outputs.sha }} [skip ci]"
           git push
