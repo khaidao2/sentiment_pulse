@@ -43,9 +43,27 @@ ARRAY_COLS = {
 SELECT_COLS = JOB_COLS + COMPANY_COLS + list(ARRAY_COLS)
 
 
+# Postgres cannot index a btree row wider than 2704 bytes, and every lookup
+# table has a UNIQUE index on its name. Parsers sometimes emit a whole
+# requirements paragraph as one "skill" (careerviet maps job_requirement
+# straight across), and one 6107-byte value aborted the entire sync with
+#   ProgramLimitExceeded: index row size 3016 exceeds btree version 4 maximum 2704
+# Headroom under the hard limit because the index row carries overhead on top of
+# the value itself.
+MAX_LOOKUP_BYTES = 2000
+_skipped_lookups = []
+
+
 def _upsert_lookup(cur, table, col, id_col, value):
-    """UPSERT a single lookup value, return its id (None for empty)."""
+    """UPSERT a single lookup value, return its id (None for empty/oversized)."""
     if value is None or value == "":
+        return None
+    # Guard, not truncation: a truncated paragraph is not a skill, and cutting it
+    # would mint a bogus lookup row that later exact values never match. Skipping
+    # loses the junction edge for that one value and keeps the job itself.
+    size = len(str(value).encode("utf-8"))
+    if size > MAX_LOOKUP_BYTES:
+        _skipped_lookups.append((table, size))
         return None
     cur.execute(
         f"INSERT INTO {table} ({col}) VALUES (%s) "
@@ -152,6 +170,15 @@ def main() -> None:
                 _sync_junction(cur, row["job_id"], row[arr_col], ltbl, lid, jtbl, jfk)
     pg.commit()
     print(f"reverse-etl: upserted {len(rows)} job(s) (watermark {watermark.isoformat()})")
+    if _skipped_lookups:
+        worst = max(size for _, size in _skipped_lookups)
+        tables = sorted({t for t, _ in _skipped_lookups})
+        print(
+            f"reverse-etl: skipped {len(_skipped_lookups)} lookup value(s) over "
+            f"{MAX_LOOKUP_BYTES} bytes (largest {worst}) in {', '.join(tables)}. "
+            "These are parser output that is prose, not a label — the junction "
+            "edge is dropped, the job row is not."
+        )
 
 
 if __name__ == "__main__":
