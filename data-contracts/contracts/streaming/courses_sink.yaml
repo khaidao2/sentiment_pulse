@@ -1,0 +1,59 @@
+# Kafka -> MinIO landing sink for the courses topic.
+# Consumes sentiment-pulse.courses and lands date-partitioned Parquet into the
+# raw bucket. No `sink:` block -> no ClickHouse DDL: this is the raw landing
+# zone, and ClickHouse reads the Parquet later through the s3() table function
+# (dbt/models/bronze/bronze_courses.sql).
+#
+# Without this the courses crawler publishes into a topic nothing consumes, and
+# bronze_courses reads an empty prefix.
+
+name: courses_sink
+kind: streaming
+schema_file: data-contracts/schemas/learning/courses.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: courses-value
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.courses
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+workload:
+  namespace: database
+  # Stays :latest ON PURPOSE — a16d76f: the sha pin in the generated manifest is
+  # CI's to own, and pinning one here emits a stale tag on every later render.
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: ["python", "-m", "api_crawler.sink"]
+  replicas: 1
+  sync_wave: "3"
+  port: null
+  env:
+    minio_endpoint: http://minio.database.svc.cluster.local:9000
+    minio_raw_bucket: sentiment-pulse-raw
+    sink_prefix: courses
+    # The sink's SCHEMA_PATH default is itviec's, so a second topic MUST override
+    # it: the Avro schema decides the Parquet column types, and writing course
+    # records against the job schema would fail every batch. The path is inside
+    # the image (the Dockerfile copies data-contracts/schemas/ wholesale).
+    schema_path: /app/data-contracts/schemas/learning/courses.avsc
+    # A weekly crawl arrives as one burst of ~7k records and then silence, so a
+    # bigger batch keeps the object count down; the 60s age cap still flushes the
+    # tail of the burst promptly.
+    batch_max_records: 2000
+    batch_max_seconds: 60
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:                      # REQUIRED — pyarrow buffers a batch in RAM
+      cpu: "500m"
+      memory: "512Mi"
+  env_from_secrets:
+    - env_var: MINIO_ACCESS_KEY
+      secret_name: minio-credentials
+      secret_key: accessKey
+    - env_var: MINIO_SECRET_KEY
+      secret_name: minio-credentials
+      secret_key: secretKey

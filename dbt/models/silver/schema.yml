@@ -30,3 +30,17 @@ models:
       - name: crawled_at
         data_tests:
           - not_null
+
+  - name: silver_courses
+    description: "Latest crawl per course id — the catalogue the skill matcher reads."
+    columns:
+      - name: id
+        description: "Natural key. Unique in this layer by construction."
+        data_tests:
+          - not_null
+          - unique
+      - name: level
+        description: "Difficulty band, or UNKNOWN when the catalogue published none — never inferred."
+        data_tests:
+          - accepted_values:
+              values: ["INTRO", "WORKING", "DEEP", "UNKNOWN"]

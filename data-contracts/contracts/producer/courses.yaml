@@ -38,9 +38,13 @@ crawler:
 
 airflow:
   # Weekly, not nightly: a course catalogue changes on the scale of months, and
-  # the Microsoft catalogue alone is a 14 MB response. Sunday 03:00 keeps it off
-  # the nightly job-crawl window (02:00) and before the reverse ETL at 04:00.
-  schedule: "0 3 * * 0"
+  # the Microsoft catalogue alone is a 14 MB response.
+  #
+  # Sunday 01:00, not 03:00: the hand-written dbt DAG runs `dbt build` (no
+  # selector, so every model including bronze/silver_courses) at 03:00 daily.
+  # Crawling at 03:00 races it and the week's courses would not reach silver
+  # until Monday's build. 01:00 also stays clear of the job crawls at 02:00.
+  schedule: "0 1 * * 0"
   namespace: airflow
   # :latest ON PURPOSE — a16d76f: the immutable tag in generated output is CI's
   # to own, and pinning a sha here emits a stale tag on every later render.
