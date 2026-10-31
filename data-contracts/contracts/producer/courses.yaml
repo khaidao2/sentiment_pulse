@@ -1,0 +1,54 @@
+# Free-course catalogues -> Kafka -> bronze. The course side of the learning-path
+# feature: these rows get joined to the canonical skills already extracted from
+# postings, so this crawler stores no skills of its own (the dictionary lives in
+# reverse_etl, and matching happens there, where the job index is).
+#
+# Unlike the job crawlers this one reads published APIs, not HTML, so there is no
+# Cloudflare dance and no per-page delay beyond politeness. Sources are chosen by
+# their terms, not their size — see api_crawler/jobs/courses/source.py, which
+# records why each one is allowed and why fullstack.edu.vn is not.
+
+name: courses
+kind: producer
+schema_file: data-contracts/schemas/learning/courses.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: courses-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.courses
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+sink:
+  clickhouse:
+    table: courses
+    database: default
+
+# sent-gen turns each key into an UPPER_CASE env var on the generated DAG's pod;
+# the crawler reads only that env (api_crawler/jobs/courses/config.py) and never
+# parses this file.
+crawler:
+  # Comma-separated, so a source whose API breaks can be dropped from the run
+  # without a code change or an image rebuild.
+  sources: mslearn,mitlearn,freecodecamp
+  delay: 0.2             # seconds between HTTP calls (MIT Learn is paginated)
+  max_pages: 40          # pagination ceiling per source; MIT is ~30 pages of 100
+
+airflow:
+  # Weekly, not nightly: a course catalogue changes on the scale of months, and
+  # the Microsoft catalogue alone is a 14 MB response. Sunday 03:00 keeps it off
+  # the nightly job-crawl window (02:00) and before the reverse ETL at 04:00.
+  schedule: "0 3 * * 0"
+  namespace: airflow
+  # :latest ON PURPOSE — a16d76f: the immutable tag in generated output is CI's
+  # to own, and pinning a sha here emits a stale tag on every later render.
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.jobs.courses"
+  resources:
+    cpu: "500m"
+    # 512Mi like the job crawlers is not enough: the Microsoft catalogue is a
+    # single 14 MB JSON document that is parsed whole, so the peak is the parsed
+    # object graph, not the download.
+    memory: "1Gi"

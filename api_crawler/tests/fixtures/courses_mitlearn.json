@@ -1,0 +1,425 @@
+{
+ "count": 2807,
+ "next": "https://api.learn.mit.edu/api/v1/courses/?free=true&limit=2&offset=2",
+ "previous": null,
+ "results": [
+  {
+   "id": 2737,
+   "topics": [
+    {
+     "id": 684,
+     "name": "Business & Management",
+     "icon": "RiBriefcase3Line",
+     "parent": null,
+     "channel_url": "https://learn.mit.edu/c/topic/business-management"
+    },
+    {
+     "id": 727,
+     "name": "Education Policy",
+     "icon": "RiShakeHandsLine",
+     "parent": 725,
+     "channel_url": "https://learn.mit.edu/c/topic/education-policy"
+    },
+    {
+     "id": 725,
+     "name": "Education & Teaching",
+     "icon": "RiShakeHandsLine",
+     "parent": null,
+     "channel_url": "https://learn.mit.edu/c/topic/education-teaching"
+    },
+    {
+     "id": 694,
+     "name": "Systems Thinking",
+     "icon": "RiBriefcase3Line",
+     "parent": 684,
+     "channel_url": "https://learn.mit.edu/c/topic/systems-thinking"
+    }
+   ],
+   "position": null,
+   "offered_by": {
+    "code": "mitx",
+    "name": "MITx",
+    "channel_url": "https://learn.mit.edu/c/unit/mitx",
+    "display_facet": true
+   },
+   "platform": {
+    "code": "oll",
+    "name": "Open Learning Library"
+   },
+   "course_feature": [],
+   "departments": [],
+   "certification": false,
+   "certification_type": {
+    "code": "none",
+    "name": "No Certificate"
+   },
+   "prices": [],
+   "resource_prices": [],
+   "runs": [
+    {
+     "id": 6511,
+     "instructors": [
+      {
+       "id": 2916,
+       "first_name": "Justin",
+       "last_name": "Reich",
+       "full_name": "Justin Reich"
+      },
+      {
+       "id": 617,
+       "first_name": "Elizabeth",
+       "last_name": "Huttner-Loan",
+       "full_name": "Elizabeth Huttner-Loan"
+      },
+      {
+       "id": 618,
+       "first_name": "Alyssa",
+       "last_name": "Napier",
+       "full_name": "Alyssa Napier"
+      }
+     ],
+     "image": {
+      "id": 12567,
+      "url": "https://openlearninglibrary.mit.edu/asset-v1:MITx+11.155x+1T2019+type@asset+block@course_image.jpg",
+      "description": null,
+      "alt": "Design Thinking for Leading and Learning"
+     },
+     "level": [
+      {
+       "code": "graduate",
+       "name": "Graduate"
+      }
+     ],
+     "delivery": [
+      {
+       "code": "online",
+       "name": "Online"
+      }
+     ],
+     "format": [
+      {
+       "code": "asynchronous",
+       "name": "Asynchronous"
+      }
+     ],
+     "pace": [
+      {
+       "code": "self_paced",
+       "name": "Self-paced"
+      }
+     ],
+     "resource_prices": [],
+     "run_id": "MITx+11.155x+1T2019",
+     "title": "Design Thinking for Leading and Learning",
+     "description": "A hands-on course for education leaders to learn about design thinking and explore how it can transform classroom learning and school communities.",
+     "full_description": null,
+     "last_modified": null,
+     "published": true,
+     "languages": null,
+     "url": "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+11.155x+1T2019/about",
+     "slug": null,
+     "semester": "Spring",
+     "year": 2019,
+     "start_date": null,
+     "end_date": null,
+     "enrollment_start": null,
+     "enrollment_end": null,
+     "prices": [],
+     "checksum": "5970981920489635921",
+     "availability": "anytime",
+     "location": "",
+     "duration": "6 weeks",
+     "min_weeks": 6,
+     "max_weeks": 6,
+     "time_commitment": "5 hours/week",
+     "min_weekly_hours": 5,
+     "max_weekly_hours": 5
+    }
+   ],
+   "image": {
+    "id": 12567,
+    "url": "https://openlearninglibrary.mit.edu/asset-v1:MITx+11.155x+1T2019+type@asset+block@course_image.jpg",
+    "description": null,
+    "alt": "Design Thinking for Leading and Learning"
+   },
+   "views": 16102,
+   "delivery": [
+    {
+     "code": "online",
+     "name": "Online"
+    }
+   ],
+   "free": true,
+   "resource_type_group": "course",
+   "format": [
+    {
+     "code": "asynchronous",
+     "name": "Asynchronous"
+    }
+   ],
+   "pace": [
+    {
+     "code": "self_paced",
+     "name": "Self-paced"
+    }
+   ],
+   "children": [],
+   "best_run_id": 6511,
+   "learn_url": "https://learn.mit.edu/search?resource=2737&resource_title=design-thinking-for-leading-and-learning",
+   "url_slug": "design-thinking-for-leading-and-learning",
+   "resource_type": "course",
+   "course": {
+    "course_numbers": [
+     {
+      "value": "MITx+11.155x",
+      "department": {
+       "department_id": "11",
+       "name": "Urban Studies and Planning",
+       "channel_url": null,
+       "school": null
+      },
+      "listing_type": "primary"
+     }
+    ]
+   },
+   "created_on": "2023-11-21T18:30:03.606596Z",
+   "readable_id": "MITx+11.155x",
+   "title": "Design Thinking for Leading and Learning",
+   "description": "A hands-on course for education leaders to learn about design thinking and explore how it can transform classroom learning and school communities.",
+   "full_description": "A hands-on course for education leaders to learn about design thinking and explore how it can transform classroom learning and school communities.",
+   "last_modified": "2021-01-11T15:59:07.918598Z",
+   "published": true,
+   "languages": null,
+   "url": "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+11.155x+1T2019/about",
+   "resource_category": "Course",
+   "ocw_topics": [],
+   "professional": false,
+   "next_start_date": null,
+   "availability": "anytime",
+   "completeness": 1.0,
+   "license_cc": false,
+   "test_mode": false,
+   "continuing_ed_credits": null,
+   "location": "",
+   "duration": "6 weeks",
+   "min_weeks": 6,
+   "max_weeks": 6,
+   "time_commitment": "5 hours/week",
+   "min_weekly_hours": 5,
+   "max_weekly_hours": 5,
+   "require_summaries": false
+  },
+  {
+   "id": 2738,
+   "topics": [
+    {
+     "id": 735,
+     "name": "Earth Science",
+     "icon": "RiTestTubeLine",
+     "parent": 731,
+     "channel_url": "https://learn.mit.edu/c/topic/earth-science"
+    },
+    {
+     "id": 747,
+     "name": "Engineering",
+     "icon": "RiRobot2Line",
+     "parent": null,
+     "channel_url": "https://learn.mit.edu/c/topic/engineering"
+    },
+    {
+     "id": 755,
+     "name": "Nuclear Engineering",
+     "icon": "RiRobot2Line",
+     "parent": 747,
+     "channel_url": "https://learn.mit.edu/c/topic/nuclear-engineering"
+    },
+    {
+     "id": 731,
+     "name": "Science & Math",
+     "icon": "RiTestTubeLine",
+     "parent": null,
+     "channel_url": "https://learn.mit.edu/c/topic/science-math"
+    }
+   ],
+   "position": null,
+   "offered_by": {
+    "code": "mitx",
+    "name": "MITx",
+    "channel_url": "https://learn.mit.edu/c/unit/mitx",
+    "display_facet": true
+   },
+   "platform": {
+    "code": "oll",
+    "name": "Open Learning Library"
+   },
+   "course_feature": [],
+   "departments": [],
+   "certification": false,
+   "certification_type": {
+    "code": "none",
+    "name": "No Certificate"
+   },
+   "prices": [],
+   "resource_prices": [],
+   "runs": [
+    {
+     "id": 6525,
+     "instructors": [
+      {
+       "id": 2954,
+       "first_name": "Jacopo",
+       "last_name": "Buongiorno",
+       "full_name": "Jacopo Buongiorno"
+      },
+      {
+       "id": 2955,
+       "first_name": "Anne",
+       "last_name": "White",
+       "full_name": "Anne White"
+      },
+      {
+       "id": 2956,
+       "first_name": "Michael",
+       "last_name": "Short",
+       "full_name": "Michael Short"
+      },
+      {
+       "id": 2957,
+       "first_name": "John",
+       "last_name": "Parsons",
+       "full_name": "John Parsons"
+      }
+     ],
+     "image": {
+      "id": 12581,
+      "url": "https://openlearninglibrary.mit.edu/asset-v1:MITx+22.011x+3T2018+type@asset+block@course_image.jpg",
+      "description": null,
+      "alt": "Nuclear Energy: Science, Systems and Society"
+     },
+     "level": [
+      {
+       "code": "undergraduate",
+       "name": "Undergraduate"
+      }
+     ],
+     "delivery": [
+      {
+       "code": "online",
+       "name": "Online"
+      }
+     ],
+     "format": [
+      {
+       "code": "asynchronous",
+       "name": "Asynchronous"
+      }
+     ],
+     "pace": [
+      {
+       "code": "self_paced",
+       "name": "Self-paced"
+      }
+     ],
+     "resource_prices": [],
+     "run_id": "MITx+22.011x+3T2018",
+     "title": "Nuclear Energy: Science, Systems and Society",
+     "description": "Learn how a nuclear reactor works, what the future of nuclear fusion looks like, and the numerous useful applications of nuclear radiation in four easy-to-follow modules, complemented with a chance to explore background radiation in your backyard.",
+     "full_description": null,
+     "last_modified": null,
+     "published": true,
+     "languages": null,
+     "url": "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+22.011x+3T2018/about",
+     "slug": null,
+     "semester": "Fall",
+     "year": 2018,
+     "start_date": null,
+     "end_date": null,
+     "enrollment_start": null,
+     "enrollment_end": null,
+     "prices": [],
+     "checksum": null,
+     "availability": "anytime",
+     "location": "",
+     "duration": "9 weeks",
+     "min_weeks": 9,
+     "max_weeks": 9,
+     "time_commitment": "10 hours/week",
+     "min_weekly_hours": 10,
+     "max_weekly_hours": 10
+    }
+   ],
+   "image": {
+    "id": 12581,
+    "url": "https://openlearninglibrary.mit.edu/asset-v1:MITx+22.011x+3T2018+type@asset+block@course_image.jpg",
+    "description": null,
+    "alt": "Nuclear Energy: Science, Systems and Society"
+   },
+   "views": 2482,
+   "delivery": [
+    {
+     "code": "online",
+     "name": "Online"
+    }
+   ],
+   "free": true,
+   "resource_type_group": "course",
+   "format": [
+    {
+     "code": "asynchronous",
+     "name": "Asynchronous"
+    }
+   ],
+   "pace": [
+    {
+     "code": "self_paced",
+     "name": "Self-paced"
+    }
+   ],
+   "children": [],
+   "best_run_id": 6525,
+   "learn_url": "https://learn.mit.edu/search?resource=2738&resource_title=nuclear-energy-science-systems-and-society",
+   "url_slug": "nuclear-energy-science-systems-and-society",
+   "resource_type": "course",
+   "course": {
+    "course_numbers": [
+     {
+      "value": "MITx+22.011x",
+      "department": {
+       "department_id": "22",
+       "name": "Nuclear Science and Engineering",
+       "channel_url": null,
+       "school": null
+      },
+      "listing_type": "primary"
+     }
+    ]
+   },
+   "created_on": "2023-11-21T18:30:03.709660Z",
+   "readable_id": "MITx+22.011x",
+   "title": "Nuclear Energy: Science, Systems and Society",
+   "description": "Learn how a nuclear reactor works, what the future of nuclear fusion looks like, and the numerous useful applications of nuclear radiation in four easy-to-follow modules, complemented with a chance to explore background radiation in your backyard.",
+   "full_description": "Learn how a nuclear reactor works, what the future of nuclear fusion looks like, and the numerous useful applications of nuclear radiation in four easy-to-follow modules, complemented with a chance to explore background radiation in your backyard.",
+   "last_modified": "2021-01-11T15:59:08.168138Z",
+   "published": true,
+   "languages": null,
+   "url": "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+22.011x+3T2018/about",
+   "resource_category": "Course",
+   "ocw_topics": [],
+   "professional": false,
+   "next_start_date": null,
+   "availability": "anytime",
+   "completeness": 1.0,
+   "license_cc": false,
+   "test_mode": false,
+   "continuing_ed_credits": null,
+   "location": "",
+   "duration": "9 weeks",
+   "min_weeks": 9,
+   "max_weeks": 9,
+   "time_commitment": "10 hours/week",
+   "min_weekly_hours": 10,
+   "max_weekly_hours": 10,
+   "require_summaries": false
+  }
+ ]
+}
