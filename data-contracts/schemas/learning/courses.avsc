@@ -1,0 +1,86 @@
+{
+  "type": "record",
+  "name": "Course",
+  "namespace": "com.sentpul.learning",
+  "doc": "One free course, module or learning path from an openly accessible catalogue (e.g. 'Introduction to Kubernetes' on Microsoft Learn). The learning-path feature joins these to the canonical skills extracted from job postings, so this is the course side of that join and holds no skills of its own — matching happens downstream in reverse_etl, where the skill dictionary lives.",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string",
+      "doc": "SHA-256 hex digest of url. Stable dedup key: ReplacingMergeTree orders by it, so re-crawling a course replaces its row instead of adding one. A course's url IS its identity — providers reuse titles across levels and locales."
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "doc": "Catalogue this record was fetched from: 'mslearn', 'mitlearn' or 'freecodecamp'. One value per fetcher in api_crawler/jobs/courses/source.py, so a source can be retired or re-crawled on its own."
+    },
+    {
+      "name": "provider",
+      "type": "string",
+      "doc": "Who teaches it, as the catalogue names them. E.g. 'Microsoft Learn', 'MIT OpenCourseWare', 'MITx', 'freeCodeCamp'. Distinct from source: MIT Learn's one API serves several providers."
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Course title as published. E.g. 'Implement security controls for Azure Kubernetes Service'."
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "doc": "Canonical link to the course, with provider tracking parameters stripped. This is the whole product: the feature links out and never hosts content."
+    },
+    {
+      "name": "summary",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "The provider's own blurb. Carried into the raw zone ONLY because the downstream skill matcher needs text to scan; it is dropped when the public catalogue is built, so the app never redistributes a provider's description. Null when the catalogue publishes none."
+    },
+    {
+      "name": "tags",
+      "type": {"type": "array", "items": "string"},
+      "default": [],
+      "doc": "The catalogue's own labels — Microsoft products and roles, MIT topics — with hyphens turned into spaces so the skill extractor can scan them as words. Never promoted to skills on their own: an unknown tag is dropped, the same decision the job pipeline records for tech_stack."
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "default": "en",
+      "doc": "ISO-639-1 language of instruction. Tracked because this is a Vietnamese market and 'vi' is the scarcest, most valuable attribute a course can have — every row crawled so far is 'en', which is what the hand-curation list exists to fix."
+    },
+    {
+      "name": "is_free",
+      "type": "boolean",
+      "default": true,
+      "doc": "True when the course can be taken at no cost. Only free courses are crawled, so this is always true today; the field exists so a paid catalogue can land in the same table without a schema change."
+    },
+    {
+      "name": "level",
+      "type": {
+        "type": "enum",
+        "name": "CourseLevel",
+        "doc": "How much the course assumes.",
+        "symbols": ["INTRO", "WORKING", "DEEP", "UNKNOWN"]
+      },
+      "default": "UNKNOWN",
+      "doc": "Difficulty band, mapped from the catalogue's own label (Microsoft's beginner/intermediate/advanced). UNKNOWN when the catalogue states none — never inferred from the title, because a wrong level puts a course at the wrong step of a path."
+    },
+    {
+      "name": "duration_minutes",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Stated duration in minutes. Null when the catalogue publishes none (MIT and freeCodeCamp do not). Used to order courses within one path step, shortest first."
+    },
+    {
+      "name": "license_cc",
+      "type": ["null", "boolean"],
+      "default": null,
+      "doc": "True when the provider marks the material Creative Commons (MIT Learn reports this). Null when the catalogue says nothing — absence is not permission, so a null here means 'ask before reusing anything but the link'."
+    },
+    {
+      "name": "crawled_at",
+      "type": "string",
+      "default": "",
+      "doc": "ISO-8601 UTC timestamp of this fetch, e.g. '2026-10-31T02:15:30Z'. Version column for the silver layer: keep the latest crawled_at per id. Also the staleness clock — a course nobody has re-seen in months is a dead-link candidate."
+    }
+  ]
+}

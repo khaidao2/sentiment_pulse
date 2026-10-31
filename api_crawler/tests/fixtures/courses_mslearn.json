@@ -1,0 +1,80 @@
+{
+ "modules": [
+  {
+   "summary": "Choose this module if you want to compare models by using automated machine learning, MLflow, and the Responsible AI dashboard.",
+   "levels": [
+    "beginner"
+   ],
+   "roles": [
+    "data-scientist"
+   ],
+   "products": [
+    "azure-machine-learning"
+   ],
+   "subjects": [
+    "machine-learning"
+   ],
+   "uid": "learn.wwl.experiment-azure-machine-learning",
+   "type": "module",
+   "title": "Experiment with Azure Machine Learning",
+   "duration_in_minutes": 65,
+   "popularity": 0.6278225862120161,
+   "icon_url": "https://learn.microsoft.com/en-us/training/achievements/find-best-classification-model-automated-machine-learning.svg",
+   "social_image_url": "https://learn.microsoft.com/en-us/training/achievements/generic-social.png",
+   "locale": "en-us",
+   "last_modified": "2026-10-28T17:12:00+00:00",
+   "url": "https://learn.microsoft.com/en-us/training/modules/experiment-azure-machine-learning/?WT.mc_id=api_CatalogApi",
+   "firstUnitUrl": "https://learn.microsoft.com/en-us/training/modules/experiment-azure-machine-learning/1-introduction/?WT.mc_id=api_CatalogApi",
+   "units": [
+    "learn.wwl.experiment-azure-machine-learning.introduction",
+    "learn.wwl.experiment-azure-machine-learning.preprocess-data-configure-featurization",
+    "learn.wwl.experiment-azure-machine-learning.run-job",
+    "learn.wwl.experiment-azure-machine-learning.evaluate-compare-models",
+    "learn.wwl.experiment-azure-machine-learning.model-tracking",
+    "learn.wwl.experiment-azure-machine-learning.train-models-notebooks",
+    "learn.wwl.experiment-azure-machine-learning.responsible-ai-dashboard",
+    "learn.wwl.experiment-azure-machine-learning.exercise",
+    "learn.wwl.experiment-azure-machine-learning.knowledge-check",
+    "learn.wwl.experiment-azure-machine-learning.summary"
+   ],
+   "number_of_children": 10
+  }
+ ],
+ "learningPaths": [
+  {
+   "summary": "F# is an open-source, cross-platform programming language that makes it easy to write succinct, performant, robust, and practical code. It's a general-purpose language that enables you to create many different types of applications like Web API, Desktop, IoT, Gaming and more.",
+   "levels": [
+    "beginner"
+   ],
+   "roles": [
+    "developer",
+    "student"
+   ],
+   "products": [
+    "dotnet"
+   ],
+   "uid": "learn.languages.fsharp-first-steps",
+   "type": "learningPath",
+   "title": "Take your first steps with F#",
+   "duration_in_minutes": 102,
+   "rating": {
+    "count": 0
+   },
+   "popularity": 0.2860116222673116,
+   "icon_url": "https://learn.microsoft.com/en-us/training/achievements/fsharp-first-steps-path.svg",
+   "social_image_url": "https://learn.microsoft.com/en-us/training/achievements/generic-social.png",
+   "locale": "en-us",
+   "last_modified": "2026-10-28T17:12:00+00:00",
+   "url": "https://learn.microsoft.com/en-us/training/paths/fsharp-first-steps/?WT.mc_id=api_CatalogApi",
+   "firstModuleUrl": "https://learn.microsoft.com/en-us/training/modules/fsharp-first-steps/?WT.mc_id=api_CatalogApi",
+   "modules": [
+    "learn.fsharp-first-steps",
+    "learn.fsharp-first-program",
+    "learn.fsharp-conditional",
+    "learn.fsharp-functions",
+    "learn.fsharp-lists"
+   ],
+   "number_of_children": 5
+  }
+ ]
+}
