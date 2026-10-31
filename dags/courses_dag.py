@@ -17,7 +17,7 @@ with DAG(
     dag_id="crawl_courses",
     default_args=default_args,
     description="Crawl courses",
-    schedule="0 3 * * 0",
+    schedule="0 1 * * 0",
     catchup=False,
     max_active_runs=1,
 ) as dag:

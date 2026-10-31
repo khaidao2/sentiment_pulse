@@ -39,3 +39,21 @@ models:
         data_tests:
           - accepted_values:
               values: ["AT_OFFICE", "REMOTE", "HYBRID"]
+
+  - name: bronze_courses
+    description: "Raw course records read in place from MinIO Parquet via s3(). Keeps duplicates: every weekly crawl re-reads the whole catalogue."
+    columns:
+      - name: id
+        description: "SHA-256 of the course url; the course's natural key."
+        data_tests:
+          - not_null
+      - name: url
+        description: "Canonical link to the course. The product is the link."
+        data_tests:
+          - not_null
+      - name: source
+        description: "Which catalogue it came from."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["mslearn", "mitlearn", "freecodecamp"]

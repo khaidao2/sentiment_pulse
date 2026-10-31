@@ -3,8 +3,10 @@
     python -m courses.match                      # dry run: report only
     python -m courses.match --write              # also write catalog_candidates.yaml
 
-Reads the `courses` table in ClickHouse — what api_crawler.jobs.courses landed
-there through Kafka — and never the web Postgres. Writes a FILE, never a
+Reads `silver_courses` in ClickHouse — one row per course id, deduped from the
+Parquet that api_crawler.sink landed in MinIO — and never the web Postgres. Not
+`bronze_courses`: the crawl re-reads every catalogue weekly, so bronze holds one
+copy of a course per run and matching it there would multiply every row. Writes a FILE, never a
 database: the output is a review queue, and a curator promotes rows into
 catalog.yaml, which is the only file that ever gets synced. No migration is
 involved.
@@ -52,7 +54,7 @@ COLUMNS = ["id", "source", "provider", "title", "url", "summary", "tags",
 
 
 def _fetch(ch) -> list[dict]:
-    res = ch.query(f"SELECT {', '.join(COLUMNS)} FROM courses")
+    res = ch.query(f"SELECT {', '.join(COLUMNS)} FROM silver_courses")
     return [dict(zip(res.column_names, row)) for row in res.result_rows]
 
 
@@ -116,7 +118,8 @@ def main() -> None:
     )
     courses = _fetch(ch)
     if not courses:
-        print("courses table is empty — has crawl_courses run?", file=sys.stderr)
+        print("silver_courses is empty — has crawl_courses run, and dbt after it?",
+              file=sys.stderr)
         return
 
     today = date.today().isoformat()
@@ -144,7 +147,7 @@ def main() -> None:
     from skills.dictionary import ALL_SKILLS
 
     covered = set(per_skill)
-    print(f"courses in clickhouse : {len(courses)}")
+    print(f"courses in silver      : {len(courses)}")
     print(f"no skill in title     : {dropped}  (dropped, never stored with a guess)")
     print(f"kept                  : {len(rows)}")
     print("\nby source:")
