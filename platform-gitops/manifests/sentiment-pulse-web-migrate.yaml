@@ -1,0 +1,100 @@
+# Apply the web app's schema migrations before the new version starts.
+#
+# Until this existed there was NO migration automation anywhere: the Deployment
+# had no initContainer, the namespace had no Job, and nothing in platform-gitops
+# ran dbmate. ArgoCD shipped the image and had no idea the schema had moved, so
+# a deploy carrying a pending migration would start an app whose code expected
+# tables that did not exist. Migrations were applied by hand from a laptop.
+#
+# ORDERING: this Job is sync-wave "0" and the Deployment is "1". ArgoCD finishes
+# a wave and waits for it to be healthy before starting the next, so a failed
+# migration leaves the Deployment UNSYNCED and the old replicas serving. That is
+# the whole point: a broken migration must not be able to start new pods.
+#
+# Why a wave and not a PreSync hook, which is the semantically exact tool:
+# ArgoCD v3.4.2 in this cluster demonstrably does NOT run the bitnami kafka
+# chart's `helm.sh/hook` Job -- no object, no events, absent from every sync
+# result, through both a plain sync and a hard refresh (see
+# platform-gitops/apps/kafka.yaml). Native `argocd.argoproj.io/hook` is a
+# different code path and may well work, but there is no precedent for it
+# anywhere in this repo and it is unverified here. Sync waves ARE proven to
+# work in this cluster -- root-app sequences its children by wave today. When a
+# native hook is confirmed to fire, moving this Job to PreSync is a two-line
+# change and buys cleaner Job lifecycle handling.
+#
+# Replace=true because a Job's spec is immutable: when the image tag moves, a
+# patch of the pod template would be rejected, so ArgoCD must delete and
+# recreate instead. It also means the Job re-runs on a resync, including a
+# selfHeal drift sync -- harmless, because `dbmate up` skips versions already in
+# schema_migrations. Treat a re-run as reconciliation, not as a repeat apply.
+#
+# NOT handled here, on purpose: the app still connects as `web`, which is a
+# Postgres SUPERUSER owning every table. Giving migrations their own DDL role
+# and reducing the app to DML is the right end state, but it changes table
+# ownership on a live database and needs its own change, its own rehearsal and
+# its own SealedSecret. Using the existing credential here keeps privileges
+# exactly as they are today rather than entrenching them further.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sentiment-pulse-web-migrate
+  namespace: webapp
+  labels:
+    app: sentiment-pulse-web
+    component: migrate
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Replace=true
+spec:
+  # One attempt, then fail the wave. A migration that fails twice fails for a
+  # reason; retrying it silently just delays the signal and muddies the logs.
+  backoffLimit: 0
+  # Keep the finished pod so `kubectl logs job/...` is an audit trail of what
+  # was applied and when. Without this the record vanishes on the next sync.
+  ttlSecondsAfterFinished: 604800   # 7 days
+  template:
+    metadata:
+      labels:
+        app: sentiment-pulse-web
+        component: migrate
+    spec:
+      restartPolicy: Never
+      # Talks only to Postgres. No Kubernetes API calls, so no token is mounted.
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          # MUST stay on the same tag as the Deployment's image. The two are
+          # built from one commit; a mismatch is precisely the drift this Job
+          # exists to prevent.
+          image: ghcr.io/khaidao2/sentiment-pulse-web-migrate:latest
+          imagePullPolicy: Always
+          args: ["up"]
+          envFrom:
+            - secretRef:
+                name: webapp-postgres-credentials
+          env:
+            # Composed from the secret's keys rather than stored as a DSN, the
+            # same pattern the Deployment uses, so no full connection string
+            # with an embedded password exists as a stored value anywhere.
+            - name: DATABASE_URL
+              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@webapp-postgres.webapp.svc.cluster.local:5432/$(POSTGRES_DB)?sslmode=disable
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

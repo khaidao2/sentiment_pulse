@@ -18,6 +18,14 @@ metadata:
   namespace: webapp
   labels:
     app: sentiment-pulse-web
+  annotations:
+    # Wave 1, AFTER the migration Job at wave 0. ArgoCD waits for a wave to go
+    # healthy before starting the next, so a failed migration leaves this
+    # Deployment unsynced and the running replicas untouched -- old code keeps
+    # serving the old schema rather than new code meeting tables that are not
+    # there yet. See sentiment-pulse-web-migrate.yaml for why a wave is used
+    # instead of a PreSync hook.
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   selector:
