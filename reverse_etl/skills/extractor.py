@@ -5,8 +5,8 @@ Two passes, in order of trust:
   1. `tech_stack` tags — the site's own labels. 96% are already under 40 bytes
      and look like "Python", "AWS", "CI/CD". Matched EXACTLY (after
      normalisation), so a tag is either a known skill or dropped.
-  2. free text — the description and the requirement bullets, scanned for
-     dictionary terms with explicit boundaries.
+  2. free text — the description and the requirement bullets, NFKC-folded and
+     then scanned for dictionary terms with explicit boundaries.
 
 Anything not in the dictionary is discarded. That is the point: the previous
 behaviour stored whatever the parser put in `skills`, which is how recruitment
@@ -39,6 +39,23 @@ _WS = re.compile(r"\s+")
 #         matches, because there the dot is followed by a space or nothing.
 _LEFT = r"(?<![A-Za-z0-9+#])(?<!\w\.)"
 _RIGHT = r"(?![A-Za-z0-9+#])(?!\.\w)"
+
+
+def normalize_text(value: str) -> str:
+    """NFKC-fold free text, preserving its structure.
+
+    The same Unicode guarantee as `normalize()`, but nothing else: newlines and
+    bullet decoration are kept, because the free-text pass scans a multi-line
+    blob rather than a single tag, and case is left alone because SCANNER is
+    already re.IGNORECASE -- casefolding here would change nothing but the
+    offsets.
+
+    NFKC can change string LENGTH (full-width -> half-width, ligatures,
+    decomposed Vietnamese -> composed). That is safe only because the caller
+    scans THIS string and records consumed spans as offsets into THIS string;
+    the offsets are never mapped back onto the raw input.
+    """
+    return unicodedata.normalize("NFKC", value)
 
 
 def normalize(value: str | None) -> str:
@@ -107,6 +124,10 @@ def extract_skills(tech_stack=None, description=None, requirements=None) -> list
             found[canonical] = None
 
     blob = "\n".join(str(p) for p in [description, *(requirements or [])] if p)
+    # Free text gets the SAME Unicode guarantee as the tag path, which the
+    # dictionary keys were built with: a decomposed (NFD) Vietnamese alias in a
+    # description used to be scanned raw and never matched.
+    blob = normalize_text(blob)
     if blob:
         # Consume matched spans so a shorter term cannot re-claim text a longer
         # one already took: without this, "Spring Boot" also yields "Spring",

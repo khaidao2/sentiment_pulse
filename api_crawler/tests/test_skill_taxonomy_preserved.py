@@ -104,20 +104,57 @@ def test_normalisation_protects_the_tag_path():
     assert extract_skills(tech_stack=["ｐｙｔｈｏｎ"]) == ["Python"]
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "KNOWN GAP, deliberately pinned rather than fixed here. normalize() is "
-    "applied to the dictionary keys and to the tech_stack path, but the "
-    "free-text blob in extract_skills is scanned RAW, so a decomposed (NFD) "
-    "Vietnamese alias in a description or requirement bullet never matches -- "
-    "the one place Vietnamese prose actually lives. The docstring at "
-    "extractor.py:48 advertises NFKC protection that only covers tags. "
-    "Fixing it means normalising the blob, which changes extraction for the "
-    "live jobs pipeline too, so it needs its own approval. When it is fixed, "
-    "this xfail flips to a failure -- that is the signal to promote it to a "
-    "real assertion."))
 def test_decomposed_vietnamese_matches_in_free_text():
+    """Was a strict xfail: the free-text blob used to be scanned RAW, so a
+    decomposed (NFD) Vietnamese alias never matched in the one place
+    Vietnamese prose actually lives. extract_skills now NFKC-folds the blob,
+    giving free text the same guarantee the tech_stack path always had."""
     nfd = unicodedata.normalize("NFD", "quản lý dự án")
     assert "Project Management" in extract_skills(description=f"Cần {nfd} tốt")
+
+
+def test_free_text_gets_the_same_fold_as_tags():
+    """Full-width prose folds in free text too, not only in tags."""
+    assert "Python" in extract_skills(description="Tuyển ｐｙｔｈｏｎ developer")
+
+
+def test_normalising_the_blob_does_not_shift_consumed_spans():
+    """NFKC changes string LENGTH, and the matcher records matched spans as
+    offsets. Offsets must be computed against the string actually scanned, or
+    span consumption silently lets a shorter term re-claim taken text.
+
+    The prefix here is NFD Vietnamese, so NFKC shortens it; the overlapping
+    pair "Spring Boot" / "Spring" sits after the shift.
+    """
+    prefix = unicodedata.normalize("NFD", "Cần tuyển kỹ sư giỏi")
+    assert len(prefix) != len(unicodedata.normalize("NFKC", prefix)), (
+        "this test is only meaningful while NFKC changes the prefix length")
+    got = extract_skills(description=f"{prefix} Spring Boot và Node.js")
+    assert "Spring Boot" in got
+    assert "Spring" not in got, "the shorter term re-claimed consumed text"
+    assert "Node.js" in got
+    assert "Node" not in got
+
+
+def test_span_consumption_survives_a_lengthening_fold():
+    """The other direction: the 'ﬁ' ligature makes NFKC output LONGER."""
+    blob = "Chúng tôi ﬁnd Spring Boot engineers"
+    assert len(blob) < len(unicodedata.normalize("NFKC", blob))
+    got = extract_skills(description=blob)
+    assert "Spring Boot" in got
+    assert "Spring" not in got
+
+
+@pytest.mark.parametrize("title", [
+    "kỹ sư công nghệ thông tin",
+    "kỹ thuật viên",
+    "quản trị mạng",
+])
+def test_decomposed_vietnamese_job_titles_stay_excluded(title):
+    """Folding the blob must not admit terms the taxonomy deliberately keeps
+    out: an NFD job title is still a job title."""
+    assert extract_skills(description=unicodedata.normalize("NFD", title)) == []
+    assert extract_skills(tech_stack=[unicodedata.normalize("NFD", title)]) == []
 
 
 # ── internal taxonomy remains authoritative ───────────────────────────────
