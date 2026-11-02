@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-topic-reconcile
+  namespace: argocd
+  annotations:
+    # After kafka itself (wave 1): the first run needs a reachable broker.
+    # A run that lands early simply fails and the next one reconciles.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'kafka-topic-reconcile.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

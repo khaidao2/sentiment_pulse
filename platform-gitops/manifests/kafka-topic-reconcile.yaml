@@ -1,0 +1,214 @@
+# Ensure every contract topic exists, independently of producers.
+#
+# Why this exists: nothing declared Kafka topics anywhere, so they existed only
+# because a producer had auto-created them at some point. sentiment-pulse.courses
+# is produced by a weekly crawl (Sunday 01:00), so a broker rebuild erased it and
+# courses-sink crash-looped on UNKNOWN_TOPIC_OR_PART for 40h, with up to a week
+# to go. The bitnami chart's own `provisioning` block is the obvious fix and was
+# tried first (6736c73): the chart does render Job/kafka-provisioning, but it
+# carries `helm.sh/hook: post-install,post-upgrade` and ArgoCD v3.4.2 here never
+# materializes it -- no object, no events, absent from every sync result, through
+# both a plain sync and a hard refresh. So topic existence cannot depend on a
+# Helm hook, and this CronJob owns it instead.
+#
+# Create-only by construction: kafka-topics.sh is invoked with --create
+# --if-not-exists and nothing else. There is no --alter and no --delete anywhere
+# in the script, so it cannot change partition counts, change replication
+# factors, or remove a topic -- not even one it does not know about.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topic-reconcile
+  namespace: kafka
+  labels:
+    app: kafka-topic-reconcile
+data:
+  # ── desired state ──────────────────────────────────────────────────────
+  # name:partitions:replicationFactor, one topic per line.
+  #
+  # These are the four `kafka.topic` values declared by the contracts under
+  # data-contracts/contracts. api_crawler/tests/test_topic_reconcile_contract.py
+  # derives the expected set from those contract files and fails if this list
+  # drifts, so adding a contract without adding its topic here breaks CI rather
+  # than a 3am pipeline.
+  #
+  # partitions=1 / replicationFactor=1 are not invented: every existing
+  # sentiment-pulse.* topic reports PartitionCount: 1, ReplicationFactor: 1, and
+  # the chart runs replicaCount=1, so RF>1 is impossible on a single broker.
+  #
+  # sentiment-pulse.news and sentiment-pulse.community are deliberately absent.
+  # They belong to nlp-pipeline, not to a contract here, so this reconciler is
+  # not their owner and must not create them.
+  topics: |
+    sentiment-pulse.careerviet:1:1
+    sentiment-pulse.courses:1:1
+    sentiment-pulse.itviec:1:1
+    sentiment-pulse.topcv:1:1
+
+  reconcile.sh: |
+    #!/bin/bash
+    # Create-only, idempotent Kafka topic reconciler.
+    set -euo pipefail
+
+    KT="${KAFKA_TOPICS_SH:-/opt/bitnami/kafka/bin/kafka-topics.sh}"
+    DESIRED_FILE="${DESIRED_FILE:-/config/topics}"
+    : "${KAFKA_BOOTSTRAP_SERVERS:?KAFKA_BOOTSTRAP_SERVERS is required}"
+
+    log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+    if [ ! -r "$DESIRED_FILE" ]; then
+      log "FATAL desired-state file not readable: $DESIRED_FILE"
+      exit 1
+    fi
+
+    # ── parse and validate desired state ────────────────────────────────
+    # Every non-blank line must match name:partitions:replicationFactor
+    # exactly. A malformed line is a hard failure, never a skip: skipping it
+    # would mean a topic we believe is declared is silently never reconciled.
+    #
+    # The name pattern forbids whitespace and forbids a leading '-', so no
+    # crafted entry can reach kafka-topics.sh as an extra flag or as a second
+    # argument. Combined with quoting every expansion, a ConfigMap edit cannot
+    # make this script touch a topic outside the declared list.
+    names=(); parts=(); rfs=(); lineno=0
+    while IFS= read -r raw || [ -n "$raw" ]; do
+      lineno=$((lineno + 1))
+      line="${raw%%#*}"
+      line="${line#"${line%%[![:space:]]*}"}"   # ltrim
+      line="${line%"${line##*[![:space:]]}"}"   # rtrim
+      [ -z "$line" ] && continue
+      if ! printf '%s' "$line" \
+           | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*:[1-9][0-9]*:[1-9][0-9]*$'; then
+        log "FATAL ${DESIRED_FILE}:${lineno} invalid entry: '${raw}'"
+        exit 1
+      fi
+      rest="${line#*:}"
+      names+=("${line%%:*}")
+      parts+=("${rest%%:*}")
+      rfs+=("${rest#*:}")
+    done < "$DESIRED_FILE"
+
+    if [ "${#names[@]}" -eq 0 ]; then
+      log "FATAL no topics declared in ${DESIRED_FILE}"
+      exit 1
+    fi
+
+    # ── observe ─────────────────────────────────────────────────────────
+    # A broker that is down must fail the Job, not look like convergence.
+    if ! existing="$("$KT" --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list 2>&1)"; then
+      log "FATAL cannot reach Kafka at ${KAFKA_BOOTSTRAP_SERVERS} (--list failed)"
+      printf '%s\n' "$existing" >&2
+      exit 1
+    fi
+
+    # ── reconcile ───────────────────────────────────────────────────────
+    missing=0; created=0; failed=0
+    for i in "${!names[@]}"; do
+      topic="${names[$i]}"
+      if printf '%s\n' "$existing" | grep -Fxq -- "$topic"; then
+        continue
+      fi
+      missing=$((missing + 1))
+      log "missing ${topic} -> creating (partitions=${parts[$i]} rf=${rfs[$i]})"
+      if out="$("$KT" --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
+                     --create --if-not-exists \
+                     --topic "$topic" \
+                     --partitions "${parts[$i]}" \
+                     --replication-factor "${rfs[$i]}" 2>&1)"; then
+        log "created ${topic}"
+        created=$((created + 1))
+      else
+        log "ERROR could not create ${topic}"
+        printf '%s\n' "$out" >&2
+        failed=$((failed + 1))
+      fi
+    done
+
+    # Every create is attempted before exiting, so one broken topic does not
+    # hide the rest -- but any failure still exits non-zero so the Job is
+    # marked Failed. Success is never reported on a partial reconcile.
+    if [ "$failed" -gt 0 ]; then
+      log "FAILED ${#names[@]} declared, ${created} created, ${failed} failed"
+      exit 1
+    fi
+
+    # Quiet in steady state: one line when there was nothing to do.
+    if [ "$missing" -eq 0 ]; then
+      log "ok all ${#names[@]} declared topics present"
+    else
+      log "ok created ${created}/${missing} missing (${#names[@]} declared)"
+    fi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kafka-topic-reconcile
+  namespace: kafka
+  labels:
+    app: kafka-topic-reconcile
+spec:
+  # Every 6h, matching the sent-gen-register convention in this namespace.
+  # This is the recovery window after a broker rebuild; the previous worst
+  # case was a week, bounded by the Sunday courses crawl.
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: kafka-topic-reconcile
+        spec:
+          restartPolicy: Never
+          # Talks only to Kafka over TCP and makes no Kubernetes API calls, so
+          # it needs no ServiceAccount, Role or binding -- and no API token.
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001          # bitnami images run as uid 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reconcile
+              # Same image as the broker, so kafka-topics.sh is already on the
+              # node and no new dependency enters the cluster. Must stay on
+              # bitnamilegacy: the free bitnami images were withdrawn, which is
+              # why apps/kafka.yaml overrides image.repository too.
+              image: docker.io/bitnamilegacy/kafka:3.5.1-debian-11-r1
+              imagePullPolicy: IfNotPresent
+              command: ["bash", "/config/reconcile.sh"]
+              env:
+                - name: KAFKA_BOOTSTRAP_SERVERS
+                  value: "kafka.kafka.svc.cluster.local:9092"
+                # The CLIENT listener is PLAINTEXT with an empty authorizer
+                # (KAFKA_CFG_AUTHORIZER_CLASS_NAME=""), so there is no
+                # --command-config and no credential to mount.
+                #
+                # Pin the tool heap: kafka-run-class.sh would otherwise pick a
+                # default that can exceed the memory limit and get the JVM
+                # OOMKilled rather than failing with a readable error.
+                - name: KAFKA_HEAP_OPTS
+                  value: "-Xmx256m -Xms64m"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: config
+              configMap:
+                name: kafka-topic-reconcile
