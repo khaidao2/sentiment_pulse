@@ -257,3 +257,48 @@ def test_shipped_overrides_file_is_valid():
     for mapping in (ov.deny, ov.teaches):
         for skills in mapping.values():
             assert not set(skills) - set(ALL_SKILLS)
+
+
+# ── tag_map cannot smuggle a course past the title gate ──────────────────────
+
+# 14 — a course whose ONLY skill evidence comes from the provider's tags still
+#      contributes nothing. tag_map (added 2026-11-02) resolves tags that the
+#      exact-match extractor never could, which means it can hand `mentions` to
+#      a course whose title names no skill at all. Those courses must stay
+#      dropped: the whole point of the title gate is that a tag is not a claim
+#      about what a course TEACHES.
+#
+#      This is not hypothetical. Reading tag_map's effect through match_course()
+#      instead of build_edges() suggests it adds 615 edges over 311 extra
+#      courses; through the real pipeline it adds 127, over zero extra courses,
+#      because every one of those 311 is dropped right here. The gate is what
+#      makes those two numbers differ, so it gets its own test.
+def test_a_course_matched_only_by_its_tags_is_still_dropped(run):
+    tagged_only = {
+        "id": "c-tagged", "source": "mslearn", "content_kind": "MODULE",
+        # Title names no canonical skill; `azure virtual machines` is a tag
+        # tag_map maps to Azure, and it must not rescue the course.
+        "title": "Plan and prepare your deployment",
+        "url": "https://learn/modules/plan-prepare/",
+        "summary": "", "tags": ["azure virtual machines"],
+    }
+    cur, _ = run(rows=[tagged_only], known_courses=("c-tagged",))
+    edges = _edges(cur.calls)
+    assert edges == [], f"a tag-only course must contribute no edges, got {edges}"
+
+
+# 15 — and the same tag DOES reach `mentions` once the title earns a `teaches`.
+#      Together with 14 this pins the rule exactly: tags enrich a kept course,
+#      they never keep one.
+def test_a_tag_enriches_a_course_the_title_already_kept(run):
+    kept = {
+        "id": "c-kept", "source": "mslearn", "content_kind": "MODULE",
+        "title": "Introduction to Kubernetes",
+        "url": "https://learn/modules/intro-k8s/",
+        "summary": "", "tags": ["azure virtual machines"],
+    }
+    cur, _ = run(rows=[kept], known_courses=("c-kept",))
+    by_id = _skill_id_by_name(cur.calls)
+    edges = _edges(cur.calls)
+    assert ("c-kept", by_id["Kubernetes"], "teaches") in edges
+    assert ("c-kept", by_id["Azure"], "mentions") in edges
