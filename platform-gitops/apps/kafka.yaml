@@ -12,6 +12,26 @@ spec:
     chart: kafka
     targetRevision: 23.0.7
     helm:
+      # Topics are declared here, not left to broker auto-create. Every topic
+      # below is the `kafka.topic` of a contract under data-contracts/contracts
+      # (careerviet, courses, itviec, topcv). Auto-create only lands a topic
+      # when a producer first publishes, so a weekly producer like courses
+      # leaves its consumer crash-looping on UNKNOWN_TOPIC_OR_PART for up to a
+      # week after any broker rebuild. The chart's provisioning Job is a Helm
+      # post-install/post-upgrade hook (ArgoCD PostSync) and kafka-topics.sh
+      # --if-not-exists, so re-running it is a no-op.
+      # NOTE: sentiment-pulse.news and .community are owned by nlp-pipeline,
+      # not by a contract here, so they stay auto-created.
+      values: |
+        provisioning:
+          enabled: true
+          numPartitions: 1
+          replicationFactor: 1
+          topics:
+            - name: sentiment-pulse.careerviet
+            - name: sentiment-pulse.courses
+            - name: sentiment-pulse.itviec
+            - name: sentiment-pulse.topcv
       parameters:
         - name: image.repository
           value: "bitnamilegacy/kafka"
