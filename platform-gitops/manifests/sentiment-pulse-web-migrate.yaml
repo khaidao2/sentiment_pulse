@@ -74,7 +74,7 @@ spec:
           # MUST stay on the same tag as the Deployment's image. The two are
           # built from one commit; a mismatch is precisely the drift this Job
           # exists to prevent.
-          image: ghcr.io/khaidao2/sentiment-pulse-web-migrate:latest
+          image: ghcr.io/khaidao2/sentiment-pulse-web-migrate:sha-d9b801f
           imagePullPolicy: Always
           args: ["up"]
           envFrom:
