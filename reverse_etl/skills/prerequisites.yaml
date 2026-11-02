@@ -1,0 +1,89 @@
+# Verified skill prerequisites. Hand-curated, read by prerequisites.py.
+#
+# AN EDGE HERE IS A CLAIM THAT B CANNOT BE LEARNED WITHOUT A. It orders a
+# learner's months, so a wrong edge costs real time. The bar is therefore
+# DEFINITIONAL dependence -- B is a superset of A, a subfield of A, or operates
+# ON A -- and not "these appear together in job postings".
+#
+# WHY NOT CO-OCCURRENCE. Measured on 1,115 postings and 3,782 skill pairs, the
+# directional asymmetry P(B|A) - P(A|B) is 100% determined by which skill is
+# more popular (3,767 agree, 0 disagree), because it reduces to
+# n(A,B) * (1/n(A) - 1/n(B)). Lift is symmetric and gives no direction at all,
+# and the highest-lift pairs are SUBSTITUTES -- Android/iOS at 25.3,
+# Angular/Vue.js at 12.5, both above Docker/Kubernetes at 3.88. Applied to real
+# data it says "learn CI/CD before Git" (242 postings vs 180), which is
+# backwards. Docker/Kubernetes even flips direction between role families.
+# So co-occurrence is not admissible evidence here, and the schema's
+# evidence_kind CHECK makes that a constraint rather than a convention.
+#
+# THE GRAPH IS PARTIAL ON PURPOSE. Most skills have no prerequisite and belong
+# in no order at all. 24 skills are in the MVP curation scope and this file
+# names far fewer edges than that, because an edge invented to make a path look
+# ordered is worse than an honestly unordered milestone.
+#
+# NOT IN HERE, though each was considered:
+#   Python -> Machine Learning   ML is mathematics; the Python dependence is how
+#                                courses happen to be written, not the subject.
+#   Python -> LLM                same, and LLMs are usable over HTTP from
+#                                anything.
+#   Linux -> Docker              Docker uses Linux kernel features, but Desktop
+#                                abstracts them and no course assumes sysadmin.
+#   REST API -> Microservices    services can communicate by messaging instead.
+#   CI/CD -> DevOps              DevOps is broader and cultural; the containment
+#                                does not make one a gate on the other.
+#   Docker -> Microservices      an architecture, deployable without containers.
+# Each is a real association. None is a dependence, and the difference is the
+# whole point of this file.
+
+# Who is accountable for the claims below. Every edge is a statement someone
+# must be willing to defend, so the table records a name rather than appearing
+# from nowhere. Per-edge `by:` overrides this.
+curated_by: khaidao2
+
+prerequisites:
+
+  # --- language supersets and runtimes -------------------------------------
+  - skill: TypeScript
+    requires: JavaScript
+    why: "TypeScript is a syntactic superset of JavaScript; its own docs define it as JavaScript plus types."
+  - skill: React
+    requires: JavaScript
+    why: "React components are JavaScript; JSX compiles to JavaScript function calls."
+
+  # --- SQL engines ----------------------------------------------------------
+  # Each is a relational database queried WITH SQL. The product teaches
+  # administration and dialect on top of the language; the language is the gate.
+  - skill: PostgreSQL
+    requires: SQL
+    why: "PostgreSQL is an SQL RDBMS; every interaction with it is written in SQL."
+  - skill: MySQL
+    requires: SQL
+    why: "MySQL is an SQL RDBMS; every interaction with it is written in SQL."
+  - skill: Microsoft SQL Server
+    requires: SQL
+    why: "SQL Server is an SQL RDBMS; T-SQL is a dialect of SQL."
+  - skill: Oracle
+    requires: SQL
+    why: "Oracle Database is an SQL RDBMS; PL/SQL extends SQL."
+
+  # --- operates-on relationships -------------------------------------------
+  - skill: Kubernetes
+    requires: Docker
+    why: "Kubernetes orchestrates containers; pods, images and registries are container concepts that must already mean something."
+  - skill: CI/CD
+    requires: Git
+    why: "A pipeline is triggered by commits to a version-controlled repository; there is nothing to integrate continuously without one."
+
+  # --- subfields ------------------------------------------------------------
+  - skill: Deep Learning
+    requires: Machine Learning
+    why: "Deep learning is a subfield of machine learning; it assumes training, loss and generalisation."
+  - skill: MLOps
+    requires: Machine Learning
+    why: "MLOps is the operation of machine-learning systems; there is nothing to operate first."
+  - skill: Computer Vision
+    requires: Machine Learning
+    why: "Modern computer vision is applied machine learning."
+  - skill: NLP
+    requires: Machine Learning
+    why: "Modern NLP is applied machine learning."

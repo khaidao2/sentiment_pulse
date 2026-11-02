@@ -111,4 +111,45 @@ with DAG(
         ],
     )
 
-    sync >> classify_roles
+    # Curated skill prerequisites, landed from skills/prerequisites.yaml.
+    #
+    # The ONLY sync here whose source is a file in git rather than the
+    # warehouse: no measurement can tell you Kubernetes depends on Docker, so
+    # the source is a reviewed table and this task just lands it. It therefore
+    # does not depend on sync_jobs and runs in parallel with the classifier.
+    #
+    # It DOES depend on `skills` being populated, which sync_jobs and
+    # sync_course_skills do. An edge whose skill has no lookup row yet is
+    # skipped and named, never invented.
+    #
+    # Full reconcile including DELETEs: an edge removed from the YAML after
+    # review must stop ordering learners, which an upsert alone would not do.
+    sync_prerequisites = KubernetesPodOperator(
+        task_id="sync_skill_prerequisites",
+        name="skill-prerequisites",
+        namespace="airflow",
+        image="ghcr.io/khaidao2/sentiment-pulse-reverse-etl:latest",
+        image_pull_policy="Always",
+        cmds=["python"],
+        arguments=["sync_skill_prerequisites.py", "--apply"],
+        in_cluster=True,
+        get_logs=True,
+        on_finish_action="delete_pod",
+        startup_timeout_seconds=600,
+        container_resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "50m", "memory": "128Mi"},
+            limits={"cpu": "500m", "memory": "256Mi"},
+        ),
+        env_vars=[
+            k8s.V1EnvVar(
+                name="POSTGRES_DSN",
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(
+                        name="webapp-postgres-credentials", key="dsn"
+                    )
+                ),
+            ),
+        ],
+    )
+
+    sync >> [classify_roles, sync_prerequisites]

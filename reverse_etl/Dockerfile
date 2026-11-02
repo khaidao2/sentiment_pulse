@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # is not named here builds green and then fails at runtime with
 # "can't open file", which is exactly what happened to sync_job_roles.py.
 # Adding a script to reverse_etl/ means adding it to this line too.
-COPY sync_jobs.py sync_courses.py sync_course_skills.py sync_job_roles.py backfill_skills.py backfill_requirements.py ./
+COPY sync_jobs.py sync_courses.py sync_course_skills.py sync_job_roles.py sync_skill_prerequisites.py backfill_skills.py backfill_requirements.py ./
 # the skill dictionary + extractor; without this the image still imports
 # `skills` and dies at startup
 COPY skills/ ./skills/
