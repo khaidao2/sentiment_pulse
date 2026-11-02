@@ -25,5 +25,17 @@ DAGS_DIR = REPO_ROOT / "dags"
 MANIFESTS_DIR = REPO_ROOT / "platform-gitops" / "manifests"
 APPS_DIR = REPO_ROOT / "platform-gitops" / "apps"
 
+# The reconciler's desired topic set. Aggregate, not per-contract: one file
+# lists every contract's topic, so it is emitted once after the render loop.
+TOPICS_MANIFEST = MANIFESTS_DIR / "kafka-topic-reconcile-topics.yaml"
+TOPICS_NAMESPACE = "kafka"
+
+# Single-broker cluster, and every existing sentiment-pulse.* topic reports
+# PartitionCount 1 / ReplicationFactor 1. A contract may override via
+# `kafka.partitions` / `kafka.replication_factor`; RF > 1 cannot be satisfied
+# while replicaCount is 1.
+TOPIC_PARTITIONS_DEFAULT = 1
+TOPIC_REPLICATION_FACTOR_DEFAULT = 1
+
 # NOTE: the Jinja templates dir is intentionally NOT here — renderer.py owns it
 # (it resolves templates relative to its own file, which is the correct root).

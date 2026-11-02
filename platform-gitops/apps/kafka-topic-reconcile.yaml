@@ -14,7 +14,10 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'kafka-topic-reconcile.yaml'
+      # Two files: the hand-written mechanism, and the topic set generated
+      # from the contracts by `sent-gen render`. A glob so adding a topic
+      # never needs an edit here.
+      include: 'kafka-topic-reconcile*.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: kafka

@@ -107,6 +107,30 @@ def _emit(path: Path, content: str, dry_run: bool) -> None:
         click.echo(f"  wrote {path}")
 
 
+def _render_topics(contracts: list[Contract], dry_run: bool) -> None:
+    """Emit the reconciler's desired topic set from every contract.
+
+    Aggregate, so it cannot go through _render_contract: one file names every
+    topic. Producer and streaming contracts for the same stream declare the
+    same topic, so the set is deduped and ordered by name for a stable diff.
+    """
+    seen: dict[str, dict] = {}
+    for c in contracts:
+        topic = c.kafka["topic"]
+        seen.setdefault(topic, {
+            "name": topic,
+            "partitions": c.kafka.get("partitions", config.TOPIC_PARTITIONS_DEFAULT),
+            "replication_factor": c.kafka.get(
+                "replication_factor", config.TOPIC_REPLICATION_FACTOR_DEFAULT),
+        })
+    topics = [seen[k] for k in sorted(seen)]
+    click.echo(f"[topics] {len(topics)} topic(s)")
+    _emit(config.TOPICS_MANIFEST,
+          render_template("kafka_topics_configmap.yaml.jinja",
+                          namespace=config.TOPICS_NAMESPACE, topics=topics),
+          dry_run)
+
+
 def _render_contract(c: Contract, dry_run: bool) -> None:
     click.echo(f"[{c.kind}] {c.name}")
     # ClickHouse DDL for any kind that declares a sink.
@@ -133,8 +157,10 @@ def main() -> None:
 def render(contracts_dir, dry_run) -> None:
     """Generate DAGs, k8s manifests, ArgoCD apps and DDL from every contract."""
     try:
-        for c in iter_contracts(contracts_dir):
+        contracts = list(iter_contracts(contracts_dir))
+        for c in contracts:
             _render_contract(c, dry_run)
+        _render_topics(contracts, dry_run)
     except (ContractError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
 

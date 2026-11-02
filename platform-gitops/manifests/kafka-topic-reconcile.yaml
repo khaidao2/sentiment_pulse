@@ -23,35 +23,17 @@ metadata:
   labels:
     app: kafka-topic-reconcile
 data:
-  # ── desired state ──────────────────────────────────────────────────────
-  # name:partitions:replicationFactor, one topic per line.
-  #
-  # These are the four `kafka.topic` values declared by the contracts under
-  # data-contracts/contracts. api_crawler/tests/test_topic_reconcile_contract.py
-  # derives the expected set from those contract files and fails if this list
-  # drifts, so adding a contract without adding its topic here breaks CI rather
-  # than a 3am pipeline.
-  #
-  # partitions=1 / replicationFactor=1 are not invented: every existing
-  # sentiment-pulse.* topic reports PartitionCount: 1, ReplicationFactor: 1, and
-  # the chart runs replicaCount=1, so RF>1 is impossible on a single broker.
-  #
-  # sentiment-pulse.news and sentiment-pulse.community are deliberately absent.
-  # They belong to nlp-pipeline, not to a contract here, so this reconciler is
-  # not their owner and must not create them.
-  topics: |
-    sentiment-pulse.careerviet:1:1
-    sentiment-pulse.courses:1:1
-    sentiment-pulse.itviec:1:1
-    sentiment-pulse.topcv:1:1
-
+  # The desired topic set is NOT here. It is generated from the contracts
+  # into kafka-topic-reconcile-topics.yaml by `sent-gen render`, mounted at
+  # /desired, because a hand-maintained copy of the contracts' topics is a
+  # second source of truth. This file holds only the mechanism.
   reconcile.sh: |
     #!/bin/bash
     # Create-only, idempotent Kafka topic reconciler.
     set -euo pipefail
 
     KT="${KAFKA_TOPICS_SH:-/opt/bitnami/kafka/bin/kafka-topics.sh}"
-    DESIRED_FILE="${DESIRED_FILE:-/config/topics}"
+    DESIRED_FILE="${DESIRED_FILE:-/desired/topics}"
     : "${KAFKA_BOOTSTRAP_SERVERS:?KAFKA_BOOTSTRAP_SERVERS is required}"
 
     log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -198,8 +180,11 @@ spec:
                 capabilities:
                   drop: ["ALL"]
               volumeMounts:
-                - name: config
+                - name: script
                   mountPath: /config
+                  readOnly: true
+                - name: desired
+                  mountPath: /desired
                   readOnly: true
               resources:
                 requests:
@@ -209,6 +194,10 @@ spec:
                   cpu: 500m
                   memory: 512Mi
           volumes:
-            - name: config
+            - name: script
               configMap:
                 name: kafka-topic-reconcile
+            # Generated from the contracts; see kafka-topic-reconcile-topics.yaml.
+            - name: desired
+              configMap:
+                name: kafka-topic-reconcile-topics
