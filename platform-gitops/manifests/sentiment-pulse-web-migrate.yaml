@@ -22,9 +22,12 @@
 # native hook is confirmed to fire, moving this Job to PreSync is a two-line
 # change and buys cleaner Job lifecycle handling.
 #
-# Replace=true because a Job's spec is immutable: when the image tag moves, a
-# patch of the pod template would be rejected, so ArgoCD must delete and
-# recreate instead. It also means the Job re-runs on a resync, including a
+# Force=true,Replace=true because a Job's spec is immutable: when the image tag
+# moves, patching the pod template is rejected. Replace alone is NOT enough --
+# it makes ArgoCD run `kubectl replace`, which for a Job demands the
+# auto-generated spec.selector and controller-uid labels that no hand-written
+# manifest carries, and fails with "spec.selector: Required value ... field is
+# immutable". Force makes ArgoCD delete the Job and create it again instead. It also means the Job re-runs on a resync, including a
 # selfHeal drift sync -- harmless, because `dbmate up` skips versions already in
 # schema_migrations. Treat a re-run as reconciliation, not as a repeat apply.
 #
@@ -44,7 +47,7 @@ metadata:
     component: migrate
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/sync-options: Replace=true
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   # One attempt, then fail the wave. A migration that fails twice fails for a
   # reason; retrying it silently just delays the signal and muddies the logs.
