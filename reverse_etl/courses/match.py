@@ -152,8 +152,9 @@ def build_edges(rows: list[dict], ov=None) -> tuple[list[tuple[str, str, str]], 
     A course with no `teaches` after curation contributes NO edges at all, not
     even its `mentions`: "this course mentions Docker" is not a reason to put it
     in a catalogue of what to learn, and storing it would make the mentions-only
-    tail look like coverage. 991 of today's 5,961 drops are in exactly that
-    state, and they stay out.
+    tail look like coverage. 1,305 of today's 5,964 drops are in exactly that
+    state, and they stay out -- a figure that ROSE when tag_map landed, because
+    tag_map gives mentions to courses whose titles still match nothing.
     """
     edges: list[tuple[str, str, str]] = []
     report = Report()
