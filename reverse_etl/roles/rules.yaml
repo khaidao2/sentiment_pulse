@@ -1,0 +1,203 @@
+# Job title -> role family. Hand-maintained, read by classify.py.
+#
+# WHY PHRASES, NOT WORDS. 1,192 of 1,271 titles are distinct, so an exact title
+# match classifies almost nothing. Single tokens are worse than useless: `data`
+# appears in both "Data Engineer" and "Data Scientist", and `ai` is also an
+# ordinary Vietnamese word. Every pattern here is therefore a PHRASE, matched as
+# a substring of the NFKC-casefolded title.
+#
+# WHY VIETNAMESE PATTERNS ARE NOT OPTIONAL. 436 of 1,271 titles (34.3%) carry
+# Vietnamese diacritics -- "Chuyên viên phân tích dữ liệu", "Nhân viên kỹ
+# thuật". An English-only rule set left 43.9% of the corpus UNKNOWN, and most of
+# that was not genuine ambiguity, just a missing language.
+#
+# EVERY RULE IS EVALUATED. There is no first-match. Two families matching means
+# the title genuinely reads as both, and the answer is AMBIGUOUS -- never the
+# first one listed. Ordering in this file carries NO meaning.
+#
+# TWO TIERS OF EVIDENCE, AND THE TIER IS DECLARED, NOT POSITIONAL. A family may
+# split its patterns into `role:` and `qualifier:`.
+#   role       names the job itself -- "backend", "fullstack". Strong evidence.
+#   qualifier  names the STACK, not the role -- "java developer". A Java
+#              developer may be backend or fullstack; the language does not say.
+# Role patterns decide. Qualifiers decide only when NO role pattern matched
+# anywhere. This is not first-match: every rule is still evaluated, the outcome
+# does not depend on ordering in this file, and the tier is written down rather
+# than implied. It is the same idea as teaches/mentions in courses -- weaker
+# evidence is kept and used, but never outranks the strong kind.
+#
+# It exists because of three real titles: "Senior Fullstack PHP Developer" and
+# "Fullstack Java Developer" are plainly Fullstack, while "Fullstack Developer
+# (Back-end)" names two roles and stays AMBIGUOUS. Without tiers all three
+# collided; with them, only the genuine hybrid does.
+#
+# SENIORITY IS NOT A FAMILY. "Manager" says how senior someone is, not what they
+# do; an earlier version of this work treated it as a family and produced a
+# "Mgmt" bucket that mixed engineering managers with product managers. Seniority
+# is parsed separately, below, and never contributes to the family decision.
+
+families:
+
+  Backend:
+    # Bare "developer" is deliberately absent: it is in half the titles here and
+    # would make almost everything AMBIGUOUS.
+    role:
+      - backend
+      - back-end
+      - back end
+      - lập trình viên backend
+    # 12 of 79 Backend postings are named ONLY by their language. Keeping them
+    # as qualifiers holds those 12 without letting a language outrank a role.
+    qualifier:
+      - java developer
+      - java engineer
+      - .net developer
+      - php developer
+      - golang developer
+      - node.js developer
+
+  Frontend:
+    role:
+      - frontend
+      - front-end
+      - front end
+      - lập trình viên frontend
+    qualifier:
+      - reactjs developer
+      - angular developer
+
+  Fullstack:
+    - fullstack
+    - full-stack
+    - full stack
+
+  Mobile:
+    role:
+      - mobile developer
+      - mobile engineer
+      - android developer
+      - android engineer
+      - ios developer
+      - ios engineer
+    qualifier:
+      - flutter developer
+      - react native
+
+  Data:
+    - data engineer
+    - data analyst
+    - data warehouse
+    - business intelligence
+    - kỹ sư dữ liệu
+    - phân tích dữ liệu
+    - chuyên viên dữ liệu
+    - kho dữ liệu
+    # Governance / administration / quality are Data work, and 30+ UNKNOWN
+    # titles used these phrases rather than "engineer" or "analyst".
+    - data governance
+    - data quality
+    - quản trị dữ liệu
+    - chất lượng dữ liệu
+    - quản lý dữ liệu
+
+  "ML/AI":
+    - machine learning
+    - data scientist
+    - ai engineer
+    - ai expert
+    - ai developer
+    - deep learning
+    - computer vision
+    - trí tuệ nhân tạo
+    - khoa học dữ liệu
+
+  DevOps:
+    - devops
+    - sre
+    - site reliability
+    - platform engineer
+    - infrastructure engineer
+    - cloud engineer
+    - system engineer
+    - kỹ sư hệ thống
+    - system administrator
+    - quản trị hệ thống
+    - quản trị mạng
+    - cloud operations
+
+  QA:
+    - qa engineer
+    - qc engineer
+    - tester
+    - quality assurance
+    - sdet
+    - automation test
+    - manual test
+    - kiểm thử
+
+  Security:
+    - security engineer
+    - security analyst
+    - penetration test
+    - an toàn thông tin
+    - bảo mật
+
+  # Running and supporting the company's own IT, not building a product. A
+  # distinct demand profile (helpdesk, networks, endpoints), and 88 UNKNOWN
+  # titles carried `it` as a bare qualifier with no engineering specialism.
+  "IT Support":
+    - nhân viên it
+    - it helpdesk
+    - it support
+    - it supervisor
+    - hỗ trợ kỹ thuật
+    - chuyên viên công nghệ thông tin
+
+  # `architect` appeared 25 times in UNKNOWN. Kept separate from Backend
+  # because the postings describe design and governance work, not implementation.
+  Architecture:
+    - solution architect
+    - software architect
+    - technical architect
+    - enterprise architect
+    - data architect
+
+  "Business Analysis":
+    - business analyst
+    - nghiệp vụ
+
+  "Product/Project":
+    - product owner
+    - product manager
+    - project manager
+    - scrum master
+    - quản lý dự án
+
+# Parsed independently of family and never used to decide one. A title may carry
+# no seniority marker at all, which is recorded as null rather than guessed.
+seniority:
+  intern:
+    - intern
+    - internship
+    - thực tập
+  junior:
+    - junior
+    - fresher
+  middle:
+    - middle
+    - mid-level
+  senior:
+    - senior
+    - cao cấp
+  lead:
+    - tech lead
+    - team lead
+    - principal
+    - staff engineer
+    - trưởng nhóm
+  manager:
+    - manager
+    - head of
+    - director
+    - trưởng phòng
+    - giám đốc

@@ -24,7 +24,7 @@ default_args = {
 with DAG(
     dag_id="reverse_etl_itviec",
     default_args=default_args,
-    description="Upsert silver_current -> web Postgres jobs table",
+    description="Upsert silver_current -> web Postgres jobs, then classify role families",
     schedule="0 4 * * *",  # after transform_itviec (0 3 * * *)
     start_date=datetime(2026, 1, 1),
     catchup=False,
@@ -67,3 +67,48 @@ with DAG(
             ),
         ],
     )
+
+    # Role family for every posting, derived from `jobs.title` by the rule
+    # table in reverse_etl/roles/rules.yaml.
+    #
+    # DOWNSTREAM OF sync_jobs, NOT PARALLEL TO IT: this reads the `jobs` rows
+    # that task just landed, so running them concurrently would classify the
+    # previous run's corpus and leave new postings unclassified until tomorrow.
+    #
+    # No ClickHouse env: the titles come from Postgres, which is both the
+    # foreign-key parent and the only place app-posted jobs exist. See the
+    # module docstring for why this one job does not read the warehouse.
+    #
+    # Full rebuild every run, UPSERT on the primary key. Not watermarked,
+    # because these rows change when the RULES change and a watermark cannot
+    # see that.
+    classify_roles = KubernetesPodOperator(
+        task_id="sync_job_roles",
+        name="itviec-role-classify",
+        namespace="airflow",
+        image="ghcr.io/khaidao2/sentiment-pulse-reverse-etl:latest",
+        image_pull_policy="Always",
+        cmds=["python"],
+        arguments=["sync_job_roles.py", "--apply"],
+        in_cluster=True,
+        get_logs=True,
+        on_finish_action="delete_pod",
+        # Same reason as sync_jobs: a cold pull outlasts KPO's 120s default.
+        startup_timeout_seconds=600,
+        container_resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "50m", "memory": "128Mi"},
+            limits={"cpu": "500m", "memory": "256Mi"},
+        ),
+        env_vars=[
+            k8s.V1EnvVar(
+                name="POSTGRES_DSN",
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(
+                        name="webapp-postgres-credentials", key="dsn"
+                    )
+                ),
+            ),
+        ],
+    )
+
+    sync >> classify_roles
