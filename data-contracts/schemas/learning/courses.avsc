@@ -68,7 +68,7 @@
       "name": "duration_minutes",
       "type": ["null", "int"],
       "default": null,
-      "doc": "Stated duration in minutes. Null when the catalogue publishes none (MIT and freeCodeCamp do not). Used to order courses within one path step, shortest first."
+      "doc": "Stated duration in minutes, SOURCE-PROVIDED only. Microsoft publishes this; MIT does not -- it publishes weeks plus a weekly commitment, which this int cannot hold, so MIT rows carry duration_text, duration_weeks_min and weekly_hours_min instead and leave this null. freeCodeCamp publishes no duration at all. Orders courses within one path step, shortest first -- but ONLY within a single content_kind, since a learning path contains the modules it would be compared against."
     },
     {
       "name": "license_cc",
@@ -81,6 +81,71 @@
       "type": "string",
       "default": "",
       "doc": "ISO-8601 UTC timestamp of this fetch, e.g. '2026-10-31T02:15:30Z'. Version column for the silver layer: keep the latest crawled_at per id. Also the staleness clock — a course nobody has re-seen in months is a dead-link candidate."
+    },
+    {
+      "name": "uid",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "The catalogue's own identifier (Microsoft `uid`, e.g. 'learn.languages.fsharp-first-steps'). Null where the source publishes none -- freeCodeCamp rows are synthesised from filenames and have no id but their url. Hierarchy is expressed in these uids, not in `id`, which is a hash of the url and is ours, not the source's."
+    },
+    {
+      "name": "content_kind",
+      "type": {
+        "type": "enum",
+        "name": "CourseContentKind",
+        "doc": "What kind of thing this row is. Read from the catalogue's own `type` field, never inferred.",
+        "symbols": ["LEARNING_PATH", "MODULE", "COURSE", "UNKNOWN"]
+      },
+      "default": "UNKNOWN",
+      "doc": "LEARNING_PATH is an ordered container of MODULEs; a MODULE is an ordered container of units; COURSE is a standalone item (MIT, freeCodeCamp). Microsoft publishes `type` ('module'/'learningPath') and this is a direct read of it -- a learning path must never be ranked as an ordinary module, and `duration_minutes` is not comparable across kinds (a 102-minute path CONTAINS 65-minute modules)."
+    },
+    {
+      "name": "child_uids",
+      "type": {"type": "array", "items": "string"},
+      "default": [],
+      "doc": "ORDERED child uids: a learning path's modules, or a module's units. Position IS the sequence -- index 0 is step 1. This is the only curriculum ordering any source gives us, so it is stored verbatim and never sorted. Empty for COURSE rows and for anything with no children."
+    },
+    {
+      "name": "child_count",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "The source's own `number_of_children`. Kept precisely so incomplete hierarchy is DETECTABLE: when this exceeds len(child_uids), or a child uid is absent from the crawl, the hierarchy is partial. Paging and max_pages guarantee that happens. Never reconcile the two -- a disagreement is the signal."
+    },
+    {
+      "name": "first_child_url",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Source `firstModuleUrl` (paths) or `firstUnitUrl` (modules): where a learner actually starts. Units are NOT crawlable entities -- the catalogue exposes no units array, only uid references -- so this is the only unit-level url that exists."
+    },
+    {
+      "name": "parent_uids",
+      "type": {"type": "array", "items": "string"},
+      "default": [],
+      "doc": "Containers that list this row in their children, resolved ONLY against uids present in the same crawl. A module whose path was not crawled keeps an empty list: that is honest, where a guessed parent would not be. Not ordered and not a step index -- a module can sit at position 2 of one path and 5 of another, so its position lives in the parent's child_uids, not here."
+    },
+    {
+      "name": "duration_text",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "The source's duration string exactly as published, e.g. '6 weeks' or '5 hours/week'. Display and audit only; never parsed for ranking."
+    },
+    {
+      "name": "duration_weeks_min",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Source `min_weeks` (MIT). A calendar span, NOT effort, and not convertible to minutes without assuming a study rate the source never states."
+    },
+    {
+      "name": "weekly_hours_min",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Source `min_weekly_hours` (MIT). Effort per week; combine with duration_weeks_min only as an explicit, labelled estimate."
+    },
+    {
+      "name": "duration_is_derived",
+      "type": "boolean",
+      "default": false,
+      "doc": "False means every duration field above came from the source. No estimates are produced today, so this is False on every row; it exists so a future derived value can never be mistaken for a published one."
     }
   ]
 }

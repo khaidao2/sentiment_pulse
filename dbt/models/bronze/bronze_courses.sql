@@ -44,5 +44,15 @@ from s3(
      level String,
      duration_minutes Nullable(Int32),
      license_cc Nullable(Bool),
-     crawled_at String'
+     crawled_at String,
+     uid Nullable(String),
+     content_kind String,
+     child_uids Array(String),
+     child_count Nullable(Int32),
+     first_child_url Nullable(String),
+     parent_uids Array(String),
+     duration_text Nullable(String),
+     duration_weeks_min Nullable(Int32),
+     weekly_hours_min Nullable(Int32),
+     duration_is_derived Bool'
 )

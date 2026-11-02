@@ -44,3 +44,8 @@ models:
         data_tests:
           - accepted_values:
               values: ["INTRO", "WORKING", "DEEP", "UNKNOWN"]
+      - name: content_kind
+        description: "LEARNING_PATH / MODULE / COURSE, read from the catalogue's own type field and never inferred. A learning path contains its modules, so duration is not comparable across kinds."
+        data_tests:
+          - accepted_values:
+              values: ["LEARNING_PATH", "MODULE", "COURSE", "UNKNOWN"]
