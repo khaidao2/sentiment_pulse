@@ -63,8 +63,11 @@ jobs:
       # Pin the sink Deployment to the immutable sha- tag so ArgoCD sees the
       # manifest change and rolls out the new image automatically. The DAG stays
       # on :latest (a fresh pod pulls it each run, so no pin needed there).
-      # NOTE: this edits a sent-gen-generated file; re-running `sent-gen render`
-      # resets it to :latest, and the next image build re-pins it — it converges.
+      # NOTE: this edits a sent-gen-generated file. `sent-gen render` reads the
+      # tag back out and keeps an existing sha- pin (see _preserve_pinned_image
+      # in data-contracts/src/sentpul/cli.py), so re-rendering no longer reverts
+      # it to :latest. Keep writing the tag as `<repo>:sha-<short-sha>` — the
+      # generator recognises a pin by that exact shape.
       - name: Pin sink images to this SHA (ArgoCD auto-rollout)
         run: |
           # EVERY sink, not just itviec. All sinks run the same crawler image, so

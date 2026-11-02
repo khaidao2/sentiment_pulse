@@ -7,6 +7,7 @@ here we turn those into clean CLI errors (non-zero exit) via click.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import click
@@ -70,13 +71,59 @@ def _streaming_env(c: Contract) -> list[dict]:
     return [{"name": k, "value": v} for k, v in env.items() if v != ""]
 
 
+# An `image:` line in a rendered manifest. `imagePullPolicy:` does not match
+# (the char after "image" is "P", not ":").
+_IMAGE_LINE_RE = re.compile(r"^\s*image:\s*(\S+)\s*$", re.M)
+
+# The immutable tag CD writes: "sha-" + `git rev-parse --short HEAD`.
+_PIN_RE = re.compile(r"^sha-[0-9a-f]{7,40}$")
+
+
+def _split_image(ref: str) -> tuple[str, str]:
+    """Split an image reference into (repository, tag); tag is "" if untagged.
+
+    A ":" that is followed by a "/" is a registry port, not a tag separator.
+    """
+    repo, sep, tag = ref.rpartition(":")
+    if not sep or "/" in tag:
+        return ref, ""
+    return repo, tag
+
+
+def _preserve_pinned_image(image: str, manifest_path: Path) -> str:
+    """Keep a CD-written `sha-` pin that already sits in the manifest.
+
+    `.github/workflows/build-image.yml` seds the image tag in every generated
+    `*_sink.yaml` to the immutable `sha-<sha>` tag (so ArgoCD sees a change and
+    rolls the new build out) and commits that. The contract only carries the
+    floating `:latest` default, so a plain re-render silently reverted the pin
+    and would roll production back to whatever `:latest` points at. Treat an
+    existing `sha-` pin for the SAME repository as the newer fact and keep it.
+
+    Falls back to the contract's image when there is no manifest yet (a brand
+    new contract), when the repository differs (the contract was deliberately
+    repointed), or when the tag is not a pin (`:latest` and friends) — so the
+    contract stays the source of truth for everything except this one tag.
+    """
+    repo, _ = _split_image(image)
+    try:
+        current = manifest_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return image
+    for ref in _IMAGE_LINE_RE.findall(current):
+        cur_repo, cur_tag = _split_image(ref)
+        if cur_repo == repo and _PIN_RE.match(cur_tag):
+            return f"{repo}:{cur_tag}"
+    return image
+
+
 def _streaming_context(c: Contract) -> dict:
     w = c.workload
     return {
         "name": c.name,
         "k8s_name": c.k8s_name,
         "namespace": w.get("namespace", "database"),
-        "image": w["image"],
+        "image": _preserve_pinned_image(w["image"], c.manifest_path),
         "command": w["command"],
         "replicas": w.get("replicas", 1),
         "port": w.get("port"),
