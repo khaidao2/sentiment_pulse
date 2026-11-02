@@ -1,15 +1,28 @@
-"""Match the landed course catalogue to canonical skills, and write YAML.
+"""Match the landed course catalogue to canonical skills. Report, or hand on.
 
-    python -m courses.match                      # dry run: report only
-    python -m courses.match --write              # also write catalog_candidates.yaml
+    python -m courses.match              # read-only: the coverage report
+    python -m courses.match --sample Azure   # ...plus 10 titles behind one skill
 
 Reads `silver_courses` in ClickHouse — one row per course id, deduped from the
 Parquet that api_crawler.sink landed in MinIO — and never the web Postgres. Not
 `bronze_courses`: the crawl re-reads every catalogue weekly, so bronze holds one
-copy of a course per run and matching it there would multiply every row. Writes a FILE, never a
-database: the output is a review queue, and a curator promotes rows into
-catalog.yaml, which is the only file that ever gets synced. No migration is
-involved.
+copy of a course per run and matching it there would multiply every row.
+
+This module WRITES NOTHING. It is the matching rule and its report; the landing
+is sync_course_skills.py, which imports `build_edges` from here and UPSERTs the
+result into the web Postgres through the same reverse-ETL path sync_jobs.py and
+sync_courses.py use. That split is deliberate — see the history below.
+
+HISTORY, because the docstring that used to be here was wrong in a way worth
+recording. This module once claimed to write `catalog_candidates.yaml`, which a
+curator would promote into `catalog.yaml`, "the only file that ever gets
+synced". Neither file ever existed, nothing read them, and the generated header
+even named `courses.crawl`, a module that does not exist. A hand-curated YAML
+catalogue was also a second source of truth beside the warehouse: this repo
+lands data crawler -> Kafka -> MinIO -> dbt -> reverse-ETL -> Postgres, and a
+file promoted by hand is not that path. So the YAML emitter is gone. What
+survives of the curation idea is overrides.yaml, which corrects individual
+verdicts and cannot invent a skill (see courses/overrides.py).
 
 Fetching lives in the crawler, matching lives here, and that split is the point.
 The canonical dictionary is in reverse_etl/skills, tuned against this market's
@@ -26,7 +39,21 @@ Two match strengths, by where the skill landed:
 
 A course with no title match is DROPPED, not stored with a guess. The drop count
 is reported, because a sudden jump in it means the dictionary and the catalogue
-have drifted apart.
+have drifted apart. Measured on the 2026-11-02 crawl: 7,205 courses in silver,
+1,244 kept, 5,961 dropped, 64 of 113 canonical skills covered.
+
+THINGS THIS DELIBERATELY DOES NOT DO:
+
+  * No hierarchy inference. `content_kind` tells a LEARNING_PATH from a MODULE
+    and the two are not interchangeable, but a parent does NOT inherit its
+    children's skills and a child does not inherit its parent's. A learning path
+    whose title names no skill is dropped exactly like any other course; the
+    alternative is a path "teaching" everything underneath it.
+  * No `summary` downstream. It is read here as text to scan and is the one
+    reason the column is carried into the raw zone at all. Nothing this module
+    produces contains it — only skill names.
+  * No level, duration or language. Those are sync_courses.py's business and are
+    copied as the source published them; nothing is inferred from a title here.
 
 Env: CLICKHOUSE_HOST / CLICKHOUSE_PASSWORD / CLICKHOUSE_USER / CLICKHOUSE_DB.
 """
@@ -37,28 +64,46 @@ import argparse
 import os
 import sys
 from collections import Counter
-from datetime import date
-from pathlib import Path
 
 import clickhouse_connect
 
 from skills import extract_skills
 
-OUT = Path(__file__).parent / "catalog_candidates.yaml"
+from . import overrides as overrides_mod
 
 # The crawler's own columns; see data-contracts/schemas/learning/courses.avsc.
-# `summary` is read to scan and never written out — the public catalogue holds
-# facts and a link, not a provider's prose.
-COLUMNS = ["id", "source", "provider", "title", "url", "summary", "tags",
-           "language", "is_free", "level", "duration_minutes"]
+# `summary` is read to scan and never written out. The catalogue's facts (level,
+# duration, licence, hierarchy) are NOT selected: this module has no use for
+# them and sync_courses.py already carries them, so asking for them here would
+# only invite someone to derive something from them.
+COLUMNS = ["id", "source", "title", "url", "summary", "tags", "content_kind"]
+
+TEACHES = "teaches"
+MENTIONS = "mentions"
 
 
-def _fetch(ch) -> list[dict]:
+def client():
+    """The ClickHouse client, configured the way every job in this image is."""
+    return clickhouse_connect.get_client(
+        host=os.environ["CLICKHOUSE_HOST"],
+        username=os.environ.get("CLICKHOUSE_USER", "clickhouse"),
+        password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
+        database=os.environ.get("CLICKHOUSE_DB", "default"),
+    )
+
+
+def fetch(ch) -> list[dict]:
     res = ch.query(f"SELECT {', '.join(COLUMNS)} FROM silver_courses")
     return [dict(zip(res.column_names, row)) for row in res.result_rows]
 
 
-def _match(row: dict) -> tuple[list[str], list[str]]:
+def match_row(row: dict) -> tuple[list[str], list[str]]:
+    """The dictionary's raw verdict for one course, before any curation.
+
+    `teaches` scans the title alone. `mentions` scans title + summary + the
+    provider's tags and then subtracts `teaches`, so the two lists are disjoint
+    by construction and a skill is never stored under both relations.
+    """
     teaches = extract_skills(description=row["title"])
     everything = extract_skills(
         description=f"{row['title']} {row.get('summary') or ''}",
@@ -67,106 +112,126 @@ def _match(row: dict) -> tuple[list[str], list[str]]:
     return teaches, [s for s in everything if s not in teaches]
 
 
-def _yaml_escape(s: str) -> str:
-    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+def match_course(row: dict, ov=None) -> tuple[list[str], list[str]]:
+    """The verdict a consumer should use: raw match, then the curation gate."""
+    teaches, mentions = match_row(row)
+    if ov is None:
+        return teaches, mentions
+    return ov.apply(row["url"], teaches, mentions)
 
 
-def _write(rows: list[dict], path: Path, today: str) -> None:
-    """Hand-rolled YAML so the file reads like something a human wrote.
+class Report:
+    """What the run saw. Counts only — never a course's prose."""
 
-    No pyyaml dependency for an emitter of five scalar types, and no anchors,
-    folding or key reordering to argue with in review.
+    def __init__(self):
+        self.total = 0
+        self.kept = 0
+        self.dropped = 0
+        self.per_source: Counter[str] = Counter()
+        self.per_kind: Counter[tuple[str, str]] = Counter()
+        self.per_skill: Counter[str] = Counter()
+        self.dropped_with_mentions = 0
+        self.stale_override_urls: list[str] = []
+
+
+def build_edges(rows: list[dict], ov=None) -> tuple[list[tuple[str, str, str]], Report]:
+    """(course_id, skill, relation) for every kept course, plus the report.
+
+    A course with no `teaches` after curation contributes NO edges at all, not
+    even its `mentions`: "this course mentions Docker" is not a reason to put it
+    in a catalogue of what to learn, and storing it would make the mentions-only
+    tail look like coverage. 991 of today's 5,961 drops are in exactly that
+    state, and they stay out.
     """
-    lines = [
-        "# Course candidates, crawled — NOT yet the catalogue.",
-        "#",
-        "# Generated by `python -m courses.crawl --write`. Promote rows you have",
-        "# actually looked at into catalog.yaml; do not sync this file.",
-        f"# crawled: {today}  rows: {len(rows)}",
-        "",
-        "courses:",
-    ]
-    for r in rows:
-        lines.append(f"  - title: {_yaml_escape(r['title'])}")
-        lines.append(f"    url: {r['url']}")
-        lines.append(f"    provider: {_yaml_escape(r['provider'])}")
-        lines.append(f"    source: {r['source']}")
-        lines.append(f"    language: {r['language']}")
-        lines.append(f"    is_free: {str(r['is_free']).lower()}")
-        if r["level"]:
-            lines.append(f"    level: {r['level']}")
-        if r["duration_minutes"]:
-            lines.append(f"    duration_minutes: {r['duration_minutes']}")
-        lines.append(f"    teaches: [{', '.join(_yaml_escape(s) for s in r['teaches'])}]")
-        if r["mentions"]:
-            lines.append(f"    mentions: [{', '.join(_yaml_escape(s) for s in r['mentions'])}]")
-        lines.append(f"    crawled_at: {today}")
-        lines.append("")
-    path.write_text("\n".join(lines))
+    edges: list[tuple[str, str, str]] = []
+    report = Report()
+    seen_urls: set[str] = set()
 
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--write", action="store_true", help="write catalog_candidates.yaml")
-    args = ap.parse_args()
-
-    ch = clickhouse_connect.get_client(
-        host=os.environ["CLICKHOUSE_HOST"],
-        username=os.environ.get("CLICKHOUSE_USER", "clickhouse"),
-        password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
-        database=os.environ.get("CLICKHOUSE_DB", "default"),
-    )
-    courses = _fetch(ch)
-    if not courses:
-        print("silver_courses is empty — has crawl_courses run, and dbt after it?",
-              file=sys.stderr)
-        return
-
-    today = date.today().isoformat()
-    rows: list[dict] = []
-    dropped = 0
-    per_source: Counter[str] = Counter()
-    per_skill: Counter[str] = Counter()
-
-    for c in courses:
-        teaches, mentions = _match(c)
+    for row in rows:
+        report.total += 1
+        seen_urls.add(row["url"])
+        teaches, mentions = match_course(row, ov)
         if not teaches:
-            dropped += 1
+            report.dropped += 1
+            if mentions:
+                report.dropped_with_mentions += 1
             continue
-        per_source[c["source"]] += 1
-        for s in teaches:
-            per_skill[s] += 1
-        rows.append({
-            "title": c["title"], "url": c["url"], "provider": c["provider"],
-            "source": c["source"], "language": c["language"], "is_free": c["is_free"],
-            "level": None if c["level"] == "UNKNOWN" else c["level"].lower(),
-            "duration_minutes": c["duration_minutes"],
-            "teaches": teaches, "mentions": mentions,
-        })
+        report.kept += 1
+        report.per_source[row["source"]] += 1
+        report.per_kind[(row["source"], row["content_kind"])] += 1
+        for skill in teaches:
+            report.per_skill[skill] += 1
+            edges.append((row["id"], skill, TEACHES))
+        for skill in mentions:
+            edges.append((row["id"], skill, MENTIONS))
 
+    if ov is not None:
+        # A curated url that the catalogue no longer publishes is dead weight,
+        # and silently keeping it is how a curation file rots. Named, not
+        # removed: the course may simply be missing from this week's crawl.
+        report.stale_override_urls = sorted(ov.urls - seen_urls)
+    return edges, report
+
+
+def print_report(report: Report, edges: list[tuple[str, str, str]]) -> None:
     from skills.dictionary import ALL_SKILLS
 
-    covered = set(per_skill)
-    print(f"courses in silver      : {len(courses)}")
-    print(f"no skill in title     : {dropped}  (dropped, never stored with a guess)")
-    print(f"kept                  : {len(rows)}")
-    print("\nby source:")
-    for s, n in per_source.most_common():
-        print(f"  {s:<14} {n:>5}")
-    print(f"\nskill coverage        : {len(covered)} of {len(ALL_SKILLS)} canonical skills")
+    teaches_edges = sum(1 for _, _, rel in edges if rel == TEACHES)
+    print(f"courses in silver      : {report.total}")
+    print(f"no skill in title      : {report.dropped}  (dropped, never stored with a guess)")
+    print(f"  of those, mentions-only: {report.dropped_with_mentions}  (still dropped)")
+    print(f"kept                   : {report.kept}")
+    print(f"edges                  : {len(edges)}  ({teaches_edges} teaches, "
+          f"{len(edges) - teaches_edges} mentions)")
+    print("\nkept by source and content_kind (a LEARNING_PATH is not a MODULE):")
+    for (source, kind), n in sorted(report.per_kind.items()):
+        print(f"  {source:<14} {kind:<14} {n:>5}")
+    covered = set(report.per_skill)
+    print(f"\nskill coverage         : {len(covered)} of {len(ALL_SKILLS)} canonical skills")
     print("  top 15 by course count:")
-    for s, n in per_skill.most_common(15):
-        print(f"    {s:<22} {n:>4}")
+    for skill, n in report.per_skill.most_common(15):
+        print(f"    {skill:<22} {n:>4}")
     missing = sorted(set(ALL_SKILLS) - covered)
     print(f"\n  {len(missing)} skill(s) with NO free course found — the hand-curation list:")
     for i in range(0, len(missing), 6):
         print("    " + ", ".join(missing[i:i + 6]))
+    if report.stale_override_urls:
+        print(f"\n  {len(report.stale_override_urls)} overrides.yaml url(s) not in this crawl:")
+        for url in report.stale_override_urls:
+            print(f"    {url}")
 
-    if args.write:
-        _write(rows, OUT, today)
-        print(f"\nwrote {OUT} ({len(rows)} rows)")
-    else:
-        print("\nDRY RUN — nothing written. Pass --write to emit the YAML.")
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sample", metavar="SKILL",
+                    help="print up to 10 titles matched to SKILL, to check it by eye")
+    args = ap.parse_args()
+
+    ov = overrides_mod.load()
+    rows = fetch(client())
+    if not rows:
+        print("silver_courses is empty — has crawl_courses run, and dbt after it?",
+              file=sys.stderr)
+        return
+
+    edges, report = build_edges(rows, ov)
+    print_report(report, edges)
+
+    if args.sample:
+        print(f"\ntitles whose TITLE matched {args.sample!r}:")
+        shown = 0
+        for row in rows:
+            teaches, _ = match_course(row, ov)
+            if args.sample in teaches:
+                print(f"  {row['source']:<13} {row['content_kind']:<14} {row['title']}")
+                shown += 1
+                if shown == 10:
+                    break
+        if not shown:
+            print("  (none)")
+
+    print("\nREAD-ONLY. Nothing written: this module reports. "
+          "`python sync_course_skills.py --apply` is what lands the edges.")
 
 
 if __name__ == "__main__":

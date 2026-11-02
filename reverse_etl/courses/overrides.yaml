@@ -1,0 +1,47 @@
+# Course -> skill curation gate. Hand-maintained, read by courses/overrides.py.
+#
+# This file does NOT list courses. The catalogue is crawled and the matching is
+# the dictionary's job; this only corrects individual verdicts the dictionary
+# cannot reach, because it matches a TITLE and a title is sometimes wrong or
+# sometimes silent.
+#
+# Keyed by url, which is a course's identity (course_id = sha256(url)).
+# Every skill named here must already exist in reverse_etl/skills/dictionary.py
+# — an unknown name is a hard error, so this file can never quietly become a
+# second dictionary. `deny` is applied last and beats `teaches`.
+#
+# Measured against the 2026-11-02 crawl (7,205 courses in silver_courses):
+# 1,244 courses matched a skill in their title, 5,961 did not and are dropped.
+# Entries below are the ones actually verified by reading the titles; this file
+# is meant to stay small, and a large one means the dictionary needs the work.
+
+# ── wrong: the title names something else that happens to spell a skill ──────
+deny:
+  # "Unity Catalog" is Databricks' metastore, governed inside Azure Databricks.
+  # It is not the Unity game engine, which is what the dictionary term means.
+  # Six modules and one learning path in the mslearn Databricks curriculum trip
+  # on it; the genuine Unity courses (mixed reality, HoloLens) keep their edge.
+  - url: https://learn.microsoft.com/en-us/training/modules/create-and-organize-objects-in-unity-catalog/
+    skills: [Unity]
+  - url: https://learn.microsoft.com/en-us/training/modules/cleanse-transform-load-data-into-unity-catalog/
+    skills: [Unity]
+  - url: https://learn.microsoft.com/en-us/training/modules/secure-unity-catalog-objects/
+    skills: [Unity]
+  - url: https://learn.microsoft.com/en-us/training/modules/ingest-data-into-unity-catalog/
+    skills: [Unity]
+  - url: https://learn.microsoft.com/en-us/training/modules/govern-unity-catalog-objects/
+    skills: [Unity]
+  - url: https://learn.microsoft.com/en-us/training/paths/azure-databricks-data-engineer-secure-govern-unity-catalog/
+    skills: [Unity]
+
+# ── missing: the course teaches it and the title never says so ───────────────
+teaches:
+  # MIT 6.0002 is the stated continuation of 6.0001 "...in Python" and is taught
+  # in Python throughout; only its summary says so, which is a `mentions` and is
+  # deliberately never promoted automatically. Asserted here, by hand, per url —
+  # the same claim for the OCW and the MITx listing, because they are two
+  # courses with two urls and two ids, not one course seen twice.
+  - url: https://ocw.mit.edu/courses/6-0002-introduction-to-computational-thinking-and-data-science-fall-2016/
+    skills: [Python]
+  - url: https://learn.mit.edu/courses/course-v1:MITxT+6.00.2x
+    skills: [Python]

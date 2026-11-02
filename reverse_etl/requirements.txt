@@ -1,2 +1,5 @@
 clickhouse-connect>=0.7
 psycopg[binary]>=3.1
+# courses/overrides.yaml, the hand-edited curation gate. Only ever PARSED —
+# nothing in this image writes YAML, which is why match.py had no dependency.
+pyyaml>=6
