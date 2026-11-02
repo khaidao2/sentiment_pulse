@@ -1,0 +1,124 @@
+# Catalogue tag -> what kind of thing it is. Hand-maintained, read by tag_map.py.
+#
+# WHY THIS EXISTS. Courses carry the catalogue's own labels in `tags`: Microsoft
+# publishes `products` + `roles`, MIT publishes `topics`. Measured on the
+# 2026-11-02 crawl (7,205 courses, 32,899 course-tag pairs, 521 distinct tags):
+#
+#   resolve to a skill   10 tags    1,411 pairs   ( 4%)
+#   known non-skill      14 tags    4,005 pairs   (12%)
+#   UNRESOLVED          497 tags   27,483 pairs   (83%)
+#
+# and a free-text scan rescues NONE of the top 20 unresolved. So 83% of the tag
+# signal was silently doing nothing. parser.py de-hyphenates these tags "so the
+# skill extractor can scan them as words", but the extractor's tag path is
+# exact-match-only, so multi-word labels like "azure virtual machines" never hit.
+#
+# WHAT THIS IS NOT. It is not a second dictionary. Every name under `skill:`
+# must already exist in reverse_etl/skills/dictionary.py -- an unknown name is a
+# hard error, the same rule overrides.yaml follows. The dictionary was seeded
+# from Vietnamese JOB postings and this catalogue is Microsoft-shaped, so most
+# product tags (dynamics 365, power platform, sharepoint, intune) have no
+# canonical skill to map to and MUST NOT get one invented here. A skill this
+# market actually hires for belongs in the dictionary, where the job side sees
+# it too.
+#
+# So the table's main job is CLASSIFICATION, not enrichment: say what each
+# frequent tag is, so the remainder is a short reviewable queue instead of 83%
+# noise. `python -m courses.tag_map` prints coverage and the unclassified list.
+
+# ── tags that ARE a skill the dictionary already knows ───────────────────────
+# Mapped tags become `mentions`, never `teaches`. A tag is weaker evidence than
+# a title: a course tagged `azure` may be about something else hosted on Azure.
+# match.py's teaches/mentions split already encodes that, and this respects it.
+skill:
+  # The azure-* family are all Azure services. A course tagged with one is an
+  # Azure course; this is the single largest honest win in the table.
+  azure virtual machines: Azure
+  azure cloud services: Azure
+  azure sql database: Azure
+  azure cosmos db: Azure
+  azure storage: Azure
+  azure functions: Azure
+  azure kubernetes service: Kubernetes
+  azure devops: CI/CD
+  github: Git
+  ms copilot: Generative AI
+  microsoft copilot studio: Generative AI
+  azure ai services: Machine Learning
+  azure machine learning: Machine Learning
+
+# ── tags that are a JOB ROLE, not a skill ────────────────────────────────────
+# Microsoft's `roles` facet. dictionary.py already excludes roles on the job
+# side for the same reason: "developer" is who you are, not what you know.
+# Listed explicitly so they are classified rather than merely unmatched.
+role:
+  - administrator
+  - business user
+  - functional consultant
+  - technology manager
+  - student
+  - maker
+  - business owner
+  - k 12 educator
+  - higher ed educator
+  - school leader
+  - business leader
+  - security operations analyst
+  - solution architect
+  - security engineer
+  - data engineer
+  - developer
+  # Added after the first coverage run surfaced them by frequency. All are
+  # Microsoft `roles` values; none is a competency.
+  - devops engineer
+  - ai engineer
+  - data analyst
+  - business analyst
+  - database administrator
+  - data scientist
+  - ip admin
+  - privacy manager
+  - risk practitioner
+  - auditor
+
+# ── tags that are an ACADEMIC SUBJECT, not a skill ───────────────────────────
+# MIT's `topics` facet: a domain of study, not a technical competency.
+# "Mathematics" is not something a Vietnamese IT employer lists as a skill, and
+# mapping it to one would put a linear-algebra course at a step of a career path.
+# Kept as a declared kind so a future product can group by subject without any
+# of this leaking into skill matching.
+subject:
+  - Science & Math
+  - Engineering
+  - Social Sciences
+  - Humanities
+  - Business & Management
+  - Data Science, Analytics & Computer Technology
+  - Art, Design & Architecture
+  - Mathematics
+  - Computer Science
+  - Physics
+  - Literature
+  - History
+  - Sociology
+  - Economics
+  - Policy and Administration
+  - Systems Engineering
+  - Mechanical Engineering
+  - Biology
+  - Earth Science
+  - Anthropology
+  - Urban Studies
+  - Health & Medicine
+  - Electrical Engineering
+  - Energy, Climate & Sustainability
+  - Political Science
+  # Added after the first coverage run surfaced them by frequency.
+  - Philosophy
+  - Management
+  - Media Studies
+  - Architecture
+  - Fine Arts
+  - Linguistics
+  - Music
+  - Education

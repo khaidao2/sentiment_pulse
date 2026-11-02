@@ -70,6 +70,7 @@ import clickhouse_connect
 from skills import extract_skills
 
 from . import overrides as overrides_mod
+from . import tag_map
 
 # The crawler's own columns; see data-contracts/schemas/learning/courses.avsc.
 # `summary` is read to scan and never written out. The catalogue's facts (level,
@@ -104,11 +105,22 @@ def match_row(row: dict) -> tuple[list[str], list[str]]:
     provider's tags and then subtracts `teaches`, so the two lists are disjoint
     by construction and a skill is never stored under both relations.
     """
+    tags = list(row.get("tags") or [])
     teaches = extract_skills(description=row["title"])
     everything = extract_skills(
         description=f"{row['title']} {row.get('summary') or ''}",
-        tech_stack=list(row.get("tags") or []),
+        tech_stack=tags,
     )
+    # The extractor's tag path is exact-match-only, so multi-word labels like
+    # "azure virtual machines" matched nothing -- 83% of all course-tag pairs
+    # resolved to nothing. tag_map maps the frequent ones and, as importantly,
+    # declares which tags are job roles or academic subjects so they stay out.
+    # Mapped tags only ever reach `mentions`: a tag is weaker evidence than a
+    # title, since a course tagged `azure` may be about something else that
+    # merely runs on Azure.
+    for name in tag_map.skills_for(tags):
+        if name not in everything:
+            everything.append(name)
     return teaches, [s for s in everything if s not in teaches]
 
 
