@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: topcv-sink
-          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-ecb5a68
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-4ca50ef
           imagePullPolicy: Always
           command: ["python", "-m", "api_crawler.sink"]
           env:
