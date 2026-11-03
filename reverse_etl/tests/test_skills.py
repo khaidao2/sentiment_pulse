@@ -236,3 +236,42 @@ SHARED_CASES = [
 @_pytest.mark.parametrize("text,expected", SHARED_CASES)
 def test_the_shared_scan_contract(text, expected):
     assert set(extract_skills(description=text)) == expected
+
+
+# ── a leading dot is a name, not decoration ─────────────────────────────────
+
+
+def test_a_leading_dot_survives_when_a_letter_follows_it():
+    """".NET" is a name; "1. " and "• " are list markers.
+
+    Stripping the dot unconditionally normalised ".NET" to "net", which left
+    the skill with no term matching its own display name AND made the
+    three-letter string "net" scannable.
+    """
+    assert normalize(".NET") == ".net"
+    assert normalize(".NET Core") == ".net core"
+    assert normalize("ASP.NET") == "asp.net"
+
+
+@pytest.mark.parametrize("decorated,plain", [
+    ("1. Python", "python"), ("• Docker", "docker"), ("- Kubernetes", "kubernetes"),
+    ("2) Linux", "linux"), ("  .NET  ", ".net"),
+])
+def test_list_decoration_is_still_stripped(decorated, plain):
+    assert normalize(decorated) == plain
+
+
+def test_net_profit_is_not_the_dotnet_framework():
+    """The false positive the old rule allowed.
+
+    Latent rather than live -- measured on the corpus, 0 of 83 .NET edges came
+    from a bare "net" -- but a latent false positive in a demand figure is
+    still a wrong number waiting to happen.
+    """
+    assert extract_skills(description="Our net profit grew 20% this year") == []
+    assert extract_skills(description="A safety net for the team") == []
+
+
+def test_dotnet_itself_still_extracts():
+    assert extract_skills(description="We use .NET every day") == [".NET"]
+    assert extract_skills(description="Built on .NET Core") == [".NET Core"]

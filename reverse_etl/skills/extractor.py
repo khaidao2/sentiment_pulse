@@ -52,7 +52,19 @@ def is_scannable(term: str) -> bool:
     return len(key) >= MIN_SCANNABLE_LENGTH or bool(_SYMBOL_BEARING.search(key))
 
 # Leading list markers and trailing punctuation the parsers carry over.
-_LEAD = re.compile(r"^[\s\-–—*•·+>\d.)\]]+")
+#
+# A LEADING DOT IS ONLY DECORATION WHEN NOTHING FOLLOWS IT. "1. ", "- " and
+# "• " are list markers; ".NET" is a name. Stripping the dot unconditionally
+# normalised ".NET" to "net", which did two things: it left `.NET` with no
+# term matching its own display name, and it made the three-letter string
+# "net" a scannable term -- so "our net profit grew" extracted .NET.
+#
+# Measured on the live corpus before the fix: 0 of the 83 .NET edges came
+# from a bare "net", because the longest-first sweep lets "asp.net" and
+# "net core" claim their text first and bare "net" is rare here. A latent
+# false positive rather than a live one -- fixed before it stops being
+# latent.
+_LEAD = re.compile(r"^(?:[\s\-–—*•·+>\d)\]]+|\.(?![A-Za-z]))+")
 _TRAIL = re.compile(r"[\s:;,.…]+$")
 _WS = re.compile(r"\s+")
 
