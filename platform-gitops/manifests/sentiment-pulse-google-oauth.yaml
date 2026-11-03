@@ -2,8 +2,10 @@
 # controller (kube-system/sealed-secrets-controller). Safe to commit: only that
 # controller's private key can decrypt it, and it is namespace+name scoped.
 #
-# This is the WEB client secret from Google Cloud project `social-for`. To
-# rotate, download the new client JSON and re-seal just this value:
+# This is the WEB client secret from Google Cloud project `social-for`. It is
+# NOT mounted by the web app any more: Google is an identity provider inside
+# Keycloak. Keep it as the source for (re)configuring that IdP, and rotate it
+# here and in Keycloak together.
 #
 #   kubectl create secret generic sentiment-pulse-google-oauth -n webapp \
 #     --from-literal=GOOGLE_CLIENT_SECRET="<new secret>" \

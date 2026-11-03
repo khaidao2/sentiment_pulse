@@ -7,8 +7,9 @@
 #     secret that could drift from the database's own.
 #   * sentiment-pulse-web-secrets (SealedSecret you generate with kubeseal, see
 #     the header of sentiment-pulse-web-sealed-secrets.yaml) gives JWT_SECRET.
-#   * sentiment-pulse-google-oauth (SealedSecret) gives GOOGLE_CLIENT_SECRET.
-#     The client id is public and lives here as a literal.
+#   * sentiment-pulse-keycloak-oauth (SealedSecret) gives the Keycloak client
+#     secret. Google is an identity provider INSIDE Keycloak, so its client
+#     secret is not an env var here.
 #
 # The image is PRIVATE on ghcr.io, unlike sentiment-pulse-crawler which is
 # public and therefore needs no pull secret. Hence imagePullSecrets: ghcr-pull.
@@ -85,18 +86,24 @@ spec:
                 secretKeyRef:
                   name: sentiment-pulse-web-secrets
                   key: JWT_SECRET
-            # Google sign-in. The redirect URI must be registered on the OAuth
-            # client in project `social-for`; the callback path is served by
-            # this Deployment, and the browser comes back from Google directly.
-            - name: GOOGLE_CLIENT_ID
-              value: 342068900329-q2hnvlkuce17lbno9njnpg8qb66ivl1n.apps.googleusercontent.com
-            - name: GOOGLE_CLIENT_SECRET
+            # Keycloak brokers Google. The app adds kc_idp_hint=google to the
+            # authorization request, so Keycloak forwards straight to Google
+            # instead of rendering its own login page. The realm's Google
+            # identity provider and the skillbridge-web client are configured
+            # in Keycloak; only the client secret is needed here.
+            - name: KEYCLOAK_ISSUER
+              value: https://auth.sentpul.click/realms/data-platform
+            - name: KEYCLOAK_CLIENT_ID
+              value: skillbridge-web
+            - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: sentiment-pulse-google-oauth
-                  key: GOOGLE_CLIENT_SECRET
-            - name: GOOGLE_REDIRECT_URI
-              value: https://wepower.sentpul.click/auth/oauth/google/callback
+                  name: sentiment-pulse-keycloak-oauth
+                  key: KEYCLOAK_CLIENT_SECRET
+            - name: KEYCLOAK_REDIRECT_URI
+              value: https://wepower.sentpul.click/auth/oauth/keycloak/callback
+            - name: KEYCLOAK_IDP_HINT
+              value: google
             - name: OAUTH_FRONTEND_URL
               value: https://wepower.sentpul.click
           # connection.py raises if DATABASE_URL is unset rather than falling back
