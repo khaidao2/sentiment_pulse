@@ -25,6 +25,32 @@ from .dictionary import ALL_SKILLS, EXCLUDED
 # tech_stack tag says exactly that, where the site has already vouched for them.
 EXACT_MATCH_ONLY = {"c", "go", "r", "ml", "bi", "cv", "js", "ts", "py", "k8", "sap", "erp", "crm"}
 
+# A term carrying one of these is a name, not a word: no English or Vietnamese
+# prose produces "c#", ".net" or "c++" by accident. They are why the length
+# floor below is not the whole rule -- "c#" is two characters and perfectly
+# unambiguous, and the floor alone made it unfindable in any description.
+_SYMBOL_BEARING = re.compile(r"[+#.]")
+
+#: Below this length a bare alphanumeric term matches too much prose to scan
+#: for. A convention, not a measurement: it is the shortest length at which no
+#: dictionary term collides with a common word, checked against the 234 terms
+#: this file builds.
+MIN_SCANNABLE_LENGTH = 3
+
+
+def is_scannable(term: str) -> bool:
+    """May this term be looked for inside free text, or only matched exactly?
+
+    Exported because the web application scans CVs with the SAME vocabulary and
+    must apply the SAME rule. The dictionary owns its own ambiguity, so the
+    answer travels with each term (see sync_skill_terms.py) rather than being
+    re-derived from a list the other repository would have to keep in step.
+    """
+    key = normalize(term)
+    if not key or key in EXACT_MATCH_ONLY:
+        return False
+    return len(key) >= MIN_SCANNABLE_LENGTH or bool(_SYMBOL_BEARING.search(key))
+
 # Leading list markers and trailing punctuation the parsers carry over.
 _LEAD = re.compile(r"^[\s\-–—*•·+>\d.)\]]+")
 _TRAIL = re.compile(r"[\s:;,.…]+$")
@@ -91,7 +117,7 @@ def _build_scanner() -> list[tuple[re.Pattern[str], str]]:
     Longest-first matters: without it "Spring" would claim the text of
     "Spring Boot" and the more specific skill would be lost.
     """
-    terms = [(t, c) for t, c in LOOKUP.items() if len(t) >= 3 and t not in EXACT_MATCH_ONLY]
+    terms = [(t, c) for t, c in LOOKUP.items() if is_scannable(t)]
     terms.sort(key=lambda tc: len(tc[0]), reverse=True)
     return [
         (re.compile(rf"{_LEFT}{re.escape(term)}{_RIGHT}", re.IGNORECASE), canonical)

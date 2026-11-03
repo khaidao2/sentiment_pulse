@@ -169,3 +169,70 @@ def test_no_canonical_name_is_also_excluded():
     """A term cannot be both a skill and an exclusion — that would be ambiguous."""
     from skills.dictionary import ALL_SKILLS, EXCLUDED
     assert not {normalize(c) for c in ALL_SKILLS} & EXCLUDED
+
+
+# ── scannability: which terms may be looked for inside prose ────────────────
+
+
+def test_symbol_bearing_short_terms_are_scannable():
+    """"C#" is two characters and unambiguous; the length floor alone hid it.
+
+    Regression: before `is_scannable` the rule was `len(t) >= 3`, so no
+    description could ever yield C# -- a language 50+ postings name.
+    """
+    from skills.extractor import is_scannable
+    assert is_scannable("C#")
+    assert extract_skills(description="Backend in C# and .NET Core") == [".NET Core", "C#"]
+
+
+def test_ambiguous_short_terms_stay_exact_match_only():
+    """The floor exists for these; a symbol does not rescue a real word."""
+    from skills.extractor import is_scannable
+    for term in ("c", "go", "ml", "js", "py", "bi", "cv"):
+        assert not is_scannable(term), term
+    assert extract_skills(description="We go to the office; a grade of C is fine") == []
+
+
+def test_scannability_agrees_with_the_scanner_it_builds():
+    """`is_scannable` IS the scanner's membership rule, not a parallel one.
+
+    The web application reads this answer per term out of `skill_terms` and
+    must not have to re-derive it; if the two could disagree, a CV and a job
+    posting would be read with different vocabularies.
+    """
+    from skills.extractor import LOOKUP, SCANNER, is_scannable
+    assert len(SCANNER) == sum(1 for t in LOOKUP if is_scannable(t))
+
+
+# ── the shared scan contract ────────────────────────────────────────────────
+#
+# These cases are DUPLICATED, verbatim, in the web repository
+# (backend/tests/application/services/test_skill_scan.py::SHARED_CASES).
+#
+# The product is a set operation between a job posting read HERE and a CV read
+# THERE, which is meaningless if the two are read by different rules. The
+# repositories deploy separately and neither can import the other, so the
+# contract is pinned by identical cases on both sides: a change to one scanner
+# that is not made to the other fails a test somewhere.
+#
+# If you change a case here, change it there in the same breath.
+
+import pytest as _pytest
+
+SHARED_CASES = [
+    ("Ran k8s in production with postgres behind it", {"Kubernetes", "PostgreSQL"}),
+    ("Built the frontend in reactjs", {"React"}),
+    ("Wrote services in golang", {"Go"}),
+    ("Spring Boot services", {"Spring Boot"}),
+    ("Hosted on ASP.NET", {"ASP.NET"}),
+    ("Backend in C# and some C++", {"C#", "C++"}),
+    ("We go to the office; I got a C in maths", set()),
+    ("py is my favourite extension", set()),
+    ("Ｐｙｔｈｏｎ daily", {"Python"}),
+    ("Everything ships through CI/CD.", {"CI/CD"}),
+]
+
+
+@_pytest.mark.parametrize("text,expected", SHARED_CASES)
+def test_the_shared_scan_contract(text, expected):
+    assert set(extract_skills(description=text)) == expected
