@@ -139,15 +139,19 @@ spec:
         # binary is 61MB static and spawning a process per request degrades
         # under concurrency in a way an HTTP call to a warm instance does not.
         #
-        # localhost only. This port is not in the Service, so nothing outside
-        # the pod can ask the policy anything, and the app reaches it over the
-        # loopback interface the two containers share.
+        # Not in the Service, so nothing reaches it through a cluster address;
+        # the app calls 127.0.0.1 because the two containers share the pod's
+        # loopback. It binds the pod network (not loopback-only) for one
+        # reason: the kubelet runs HTTP probes from the NODE's namespace, so a
+        # probe with host=127.0.0.1 would check the node, and a loopback-bound
+        # server is unprobeable. Readiness matters here -- serving model calls
+        # with a dead policy is the failure this sidecar exists to prevent.
         - name: opa
           image: openpolicyagent/opa:1.22.0-static
           args:
             - "run"
             - "--server"
-            - "--addr=127.0.0.1:8181"
+            - "--addr=:8181"
             - "--log-level=error"
             # THE FILE, NOT THE DIRECTORY. A ConfigMap mount is a tree of
             # atomic-writer symlinks (..data, ..2026_...); `opa run /policy`
@@ -163,7 +167,9 @@ spec:
               mountPath: /policy
               readOnly: true
           readinessProbe:
-            httpGet: { path: /health, port: 8181, host: 127.0.0.1 }
+            # No host: the kubelet probes the POD IP. A host of 127.0.0.1
+            # probes the node and can never pass for a sidecar.
+            httpGet: { path: /health, port: 8181 }
             initialDelaySeconds: 2
           resources:
             requests:
