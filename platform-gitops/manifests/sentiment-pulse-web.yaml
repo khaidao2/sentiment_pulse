@@ -149,7 +149,12 @@ spec:
             - "--server"
             - "--addr=127.0.0.1:8181"
             - "--log-level=error"
-            - "/policy"
+            # THE FILE, NOT THE DIRECTORY. A ConfigMap mount is a tree of
+            # atomic-writer symlinks (..data, ..2026_...); `opa run /policy`
+            # walks all of them and finds the same package three times, which
+            # is a startup crash ("multiple default rules"). Naming the mounted
+            # file loads it once. A second .rego file needs its key added here.
+            - "/policy/ai__sandbox.rego"
           ports:
             - name: opa
               containerPort: 8181

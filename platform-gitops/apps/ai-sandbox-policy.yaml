@@ -1,0 +1,36 @@
+# The AI sandbox policy bundle, mounted by the OPA sidecar in
+# sentiment-pulse-web.yaml.
+#
+# WHY ITS OWN APPLICATION. The web app's Application includes only
+# `sentiment-pulse-web*.yaml`, and the generated file is named
+# ai-sandbox-policy.yaml. Leaving it out of every Application meant it was
+# applied by hand once and then silently absent when a new pod needed it --
+# which is what happened on 2026-11-03, leaving the new pod Pending on a
+# FailedMount. An Application of its own keeps the generated policy under
+# ArgoCD without renaming a file that the renderer and its pre-commit hook
+# both know by name.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-sandbox-policy
+  namespace: argocd
+  annotations:
+    # Before the web app (wave 1): its pod mounts this ConfigMap at startup.
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'ai-sandbox-policy.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: webapp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
