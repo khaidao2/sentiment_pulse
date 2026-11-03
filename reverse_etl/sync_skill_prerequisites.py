@@ -100,12 +100,20 @@ def main() -> None:
             return
 
         # Reconcile: drop what is no longer declared, then upsert the rest.
-        keep = [(r[0], r[1]) for r in rows]
-        if keep:
+        # Two parallel arrays, not a list of tuples. Postgres cannot take a
+        # row constructor against an array of anonymous composites --
+        # `(a, b) <> ALL(%s)` raises
+        #   FeatureNotSupported: input of anonymous composite types is not
+        #   implemented
+        # for every non-empty table, so the reconcile pass could never run.
+        if rows:
             cur.execute(
-                "DELETE FROM skill_prerequisites "
-                "WHERE (skill_id, requires_skill_id) <> ALL(%s)",
-                (keep,),
+                "DELETE FROM skill_prerequisites p WHERE NOT EXISTS ("
+                "  SELECT 1 FROM unnest(%s::bigint[], %s::bigint[]) "
+                "       AS k(skill_id, requires_skill_id) "
+                "  WHERE k.skill_id = p.skill_id "
+                "    AND k.requires_skill_id = p.requires_skill_id)",
+                ([r[0] for r in rows], [r[1] for r in rows]),
             )
         else:
             cur.execute("DELETE FROM skill_prerequisites")
