@@ -1,4 +1,5 @@
 .opencode/
+.serena/
 
 # Python virtual environments
 .venv/
