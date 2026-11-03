@@ -56,6 +56,28 @@ spec:
             # Composed, not stored: $(VAR) refers to the envFrom keys above.
             - name: DATABASE_URL
               value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@webapp-postgres.webapp.svc.cluster.local:5432/$(POSTGRES_DB)
+            # The AI sandbox's decision point. No default: OpaPolicy raises
+            # when this is unset, so a misconfigured deploy refuses model
+            # calls rather than making them unpoliced.
+            - name: OPA_URL
+              value: http://127.0.0.1:8181
+            # The LLM gateway. envFrom would import alias/team/user/source too,
+            # which the app has no use for, so the three it needs are named.
+            - name: AI_GATEWAY_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-credentials
+                  key: endpoint
+            - name: AI_GATEWAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-credentials
+                  key: api_key
+            - name: AI_GATEWAY_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-credentials
+                  key: model
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -86,6 +108,56 @@ spec:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             readOnlyRootFilesystem: true
+
+        # The AI sandbox's decision point, beside the app rather than shared.
+        #
+        # A SIDECAR AND NOT THE opa BINARY IN THE APP IMAGE: `opa eval` as a
+        # subprocess measures 10ms, so latency was never the issue -- the
+        # binary is 61MB static and spawning a process per request degrades
+        # under concurrency in a way an HTTP call to a warm instance does not.
+        #
+        # localhost only. This port is not in the Service, so nothing outside
+        # the pod can ask the policy anything, and the app reaches it over the
+        # loopback interface the two containers share.
+        - name: opa
+          image: openpolicyagent/opa:1.22.0-static
+          args:
+            - "run"
+            - "--server"
+            - "--addr=127.0.0.1:8181"
+            - "--log-level=error"
+            - "/policy"
+          ports:
+            - name: opa
+              containerPort: 8181
+          volumeMounts:
+            - name: ai-sandbox-policy
+              mountPath: /policy
+              readOnly: true
+          readinessProbe:
+            httpGet: { path: /health, port: 8181, host: 127.0.0.1 }
+            initialDelaySeconds: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        # Generated from backend/policy/**.rego by
+        # backend/tools/render_policy_configmap.py -- never hand-edited, so the
+        # deployed rules cannot differ from the ones `opa test` runs against.
+        - name: ai-sandbox-policy
+          configMap:
+            name: ai-sandbox-policy
 ---
 apiVersion: v1
 kind: Service
