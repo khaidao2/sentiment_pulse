@@ -1,0 +1,30 @@
+# GOOGLE_CLIENT_SECRET for sentiment-pulse-web, sealed for THIS cluster's
+# controller (kube-system/sealed-secrets-controller). Safe to commit: only that
+# controller's private key can decrypt it, and it is namespace+name scoped.
+#
+# This is the WEB client secret from Google Cloud project `social-for`. To
+# rotate, download the new client JSON and re-seal just this value:
+#
+#   kubectl create secret generic sentiment-pulse-google-oauth -n webapp \
+#     --from-literal=GOOGLE_CLIENT_SECRET="<new secret>" \
+#     --dry-run=client -o yaml | kubeseal --format yaml \
+#     > platform-gitops/manifests/sentiment-pulse-google-oauth.yaml
+#
+# NEVER put the plaintext value in this file or in a commit message.
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: sentiment-pulse-google-oauth
+  namespace: webapp
+  annotations:
+    # Applied before the Deployment (wave 1) so the pod never has to wait for
+    # the controller to create the Secret it mounts as an env var.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  encryptedData:
+    GOOGLE_CLIENT_SECRET: AgC4CF6hpsVOoGmK47zjC9p7hgGcDgaV9w9mZDhXOkNL4OMVmKQCrP7w42K/A0C8EGl8PwgorUD9uBKSnJSkl/et7GcnEit5v6BhwQWnhbI5IjAXIfZJaR3YizEVDCRl6OWSPkCJoCVUxXDGQos0rBUk9IwnE+Ylocf6f/saZLm2/fMGS40wUQ8WF/6zVjy1nVnRnalHKfd431BCbx6idtlNsZcWnNdVkkzOKzk+3cu/xK3zM4pqpW3TrkS0P1epkMmenspWLacVgxxwqw8ZmxLRvOMRBnfc1w/JaSTNOw5GpojtyIoIXlcyvpNENC0ZEvKA/fAWowRzZh69oxqD3N4vssr2804Xoi6LOdVjWuWW2cENVkaucea4wCIlEj3y0dEHVxXRnTL5RTETPq6jj102xV7IfmRwSUG3hTqVpo5Ma3tOKGjvoUUWxOp/sgrSJQG7QiXdH6pGXnwz+EWzI8DEy08wPBhqsJycFWOHOgscFncOoSK96XlJj+o1uantzBT7M67WKACYL3TP7smH1+wHlbQUrjgGhYeX3UTaYbzVsLOLYcc4BqNBzkIQioNELEJhr3ry8LLKIWQfMl5WBBS8ecqHHbze835JbhZs0JLfc6J+OsOrRLED3F1KZXCsilYDbvK/x5MYNnNBrBA1VrVSqxV7oe/fg3cELRwjAk+y1sUYkgSMEpqfX+U9BOeeWrK1kaHF5JZrWh2VrRbzMxiSEOYkM1J+1rTHk/SAkmLOuMV9xw==
+  template:
+    metadata:
+      name: sentiment-pulse-google-oauth
+      namespace: webapp
