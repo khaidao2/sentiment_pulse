@@ -75,17 +75,36 @@ CANONICAL: dict[str, list[str]] = {
     "Ansible": [],
     "Jenkins": [],
     "Git": [],
-    "CI/CD": ["ci cd", "cicd", "continuous integration", "continuous delivery"],
+    # "github actions" / "azure pipelines" are CI/CD PRODUCTS, not a second
+    # skill. A title that names one is teaching CI/CD and nothing else in the
+    # dictionary covers it; tag_map.yaml already maps the `azure devops` TAG to
+    # CI/CD, and a title is the stronger evidence of the two. Worth 19 courses
+    # on the 2026-11-02 crawl. Note what is NOT here: bare "github", which on
+    # this catalogue is 124 titles of which 52 are GitHub Copilot and 53 are
+    # Packages/Codespaces/admin — none of them CI/CD, and none of them Git.
+    # KNOWN COST: the extractor consumes a matched span, so "Explore Azure
+    # Pipelines" now teaches CI/CD and no longer Azure. That costs Azure 13 of
+    # 740 course edges and is accepted on the trade — CI/CD went 13 -> 31 and
+    # ETL 0 -> 7 — but it is a real loss, not a free win.
+    "CI/CD": ["ci cd", "cicd", "continuous integration", "continuous delivery",
+              "github actions", "github action", "azure pipelines"],
     "AWS": ["amazon web services"],
     "Azure": ["microsoft azure"],
     "GCP": ["google cloud platform", "google cloud"],
-    "Microservices": ["micro services", "microservices architecture"],
+    # Singular: MS Learn consistently writes "Build your first microservice".
+    "Microservices": ["micro services", "microservices architecture", "microservice"],
     # data / ML
     "Apache Kafka": ["kafka"],
     "Apache Spark": ["spark", "pyspark"],
     "Apache Airflow": ["airflow"],
     "dbt": ["data build tool"],
-    "ETL": [],
+    # Azure Data Factory is Microsoft's ETL service and the only thing in this
+    # catalogue that teaches ETL by any name; ETL itself appears in no title.
+    # This is a product -> skill inference and the weakest entry in this file,
+    # so it is kept to the one unambiguous product (7 courses) rather than
+    # widened to "data integration" or "data pipeline", which name the concept
+    # and would also drag in Dynamics ERP record-sync courses.
+    "ETL": ["azure data factory"],
     "Power BI": ["powerbi"],
     "Machine Learning": ["ml"],
     "Deep Learning": [],
@@ -94,10 +113,16 @@ CANONICAL: dict[str, list[str]] = {
     "MLOps": ["ml ops"],
     "Generative AI": ["gen ai", "genai"],
     "LLM": ["large language model", "large language models"],
-    "RAG": ["retrieval augmented generation"],
-    "Data Warehousing": ["data warehouse", "datawarehouse"],
+    # Hyphenated is how it is actually written in prose; normalize() folds case
+    # and whitespace but not hyphens, so the unhyphenated alias alone missed it.
+    "RAG": ["retrieval augmented generation", "retrieval-augmented generation"],
+    "Data Warehousing": ["data warehouse", "data warehouses", "datawarehouse"],
     "Data Mining": [],
-    "Data Modeling": ["data modelling"],
+    # The catalogue names the artefact ("Build your data model with Dataverse")
+    # where the dictionary names the activity. 11 courses; one of them,
+    # "Microsoft for Healthcare data model for Dataverse", describes a shipped
+    # model rather than teaching modelling, and is the known cost of this entry.
+    "Data Modeling": ["data modelling", "data model", "data models"],
     "Big Data": [],
     "Business Intelligence": ["bi"],
     # testing / quality
