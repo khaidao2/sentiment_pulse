@@ -47,7 +47,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: web
-          image: ghcr.io/khaidao2/sentiment-pulse-web:sha-34006d5
+          image: ghcr.io/khaidao2/sentiment-pulse-web:sha-b951a8a
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
