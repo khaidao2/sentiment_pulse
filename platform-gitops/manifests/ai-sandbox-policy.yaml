@@ -37,7 +37,15 @@ data:
     # Only these purposes exist. A model call with no declared purpose is a model
     # call nobody reviewed, and "we also use it for X" is how the evidence path
     # gets reached by accident.
-    declared_purposes := {"cv_skill_extraction"}
+    declared_purposes := {"cv_skill_extraction", "cover_letter_drafting"}
+    
+    # A letter may name ONLY skills the candidate confirmed, so the purposes that
+    # tolerate a stray name and the purposes that do not have to be distinguishable
+    # inside this policy. For extraction a name outside the vocabulary is dropped
+    # and counted -- cheap, because the validator was always going to decide. For a
+    # letter it is a FALSE CLAIM ABOUT A PERSON, sent to an employer under their
+    # name, and there is no downstream check that makes it cheap.
+    strict_purposes := {"cover_letter_drafting"}
     
     # A CV longer than this is a pasted document rather than a profile. Bounded
     # because cost and latency scale with it, and because the useful signal is in
@@ -73,9 +81,23 @@ data:
     
     # Constrained generation is the whole design: a model with no allow-list is
     # being asked to invent, which is the one thing it must never do here.
+    #
+    # A LETTER IS EXEMPT, and only at this gate. Its allow-list is the candidate's
+    # CONFIRMED skills, which may legitimately be empty -- someone applying on
+    # experience rather than a skill list still deserves a letter. The guarantee
+    # does not weaken: with an empty allow-list every skill the draft names lands
+    # in `rejected`, and the strict response rule below refuses ANY unconfirmed
+    # name, so an empty list constrains the letter to naming nothing.
     request_denials contains "no allow-list supplied; unconstrained generation is not permitted" if {
+    	not input.purpose in strict_purposes
     	count(input.allowed) == 0
     }
+    
+    # A drafted letter longer than this is not a cover letter. Bounded on the
+    # RESPONSE side as well as the request side, because the failure mode that
+    # matters here is a model that keeps writing -- and the more it writes about a
+    # person, the more of it nobody supplied.
+    max_letter_chars := 4000
     
     # ---------------------------------------------------------------------------
     # Gate 2: the response
@@ -116,6 +138,42 @@ data:
     	count(input.response) > 0
     	count(rejected) * 2 > count(input.response)
     	msg := sprintf("%d of %d names are outside the vocabulary; the allow-list was ignored", [count(rejected), count(input.response)])
+    }
+    
+    # ---------------------------------------------------------------------------
+    # Gate 2, stricter: a letter drafted about a person
+    # ---------------------------------------------------------------------------
+    #
+    # WHAT `response` MEANS FOR A LETTER. The caller does not hand the policy the
+    # prose and ask it to judge writing. It scans the draft for every name in the
+    # vocabulary and passes THOSE -- the skill claims the letter makes -- as
+    # `response`, with the candidate's CONFIRMED skills as `allowed`. So `rejected`
+    # is exactly the set of skills the letter claims that the candidate never
+    # confirmed, and the rule below is the one that matters in this whole file.
+    
+    # ONE unconfirmed skill refuses the WHOLE letter. Not the majority rule above:
+    # a letter that claims AWS for someone who has never used it is not 20% wrong,
+    # it is a lie with four true sentences around it, and keeping the true
+    # sentences is how it reaches an employer.
+    response_denials contains msg if {
+    	input.purpose in strict_purposes
+    	count(rejected) > 0
+    	msg := sprintf("the draft claims %v, which the candidate did not confirm; a letter may only name confirmed skills", [rejected])
+    }
+    
+    # The prose itself is passed as `text` on the response call, so its length is
+    # checkable here rather than only in the client.
+    response_denials contains msg if {
+    	input.purpose in strict_purposes
+    	count(input.text) > max_letter_chars
+    	msg := sprintf("the draft is %d chars, over the %d limit for a letter", [count(input.text), max_letter_chars])
+    }
+    
+    # A letter with no skill claims at all is not an error -- a candidate may be
+    # applying on something other than a skill list -- but an EMPTY draft is.
+    response_denials contains "the draft is empty; there is nothing to send" if {
+    	input.purpose in strict_purposes
+    	count(trim_space(input.text)) == 0
     }
     
     # The decision a caller consumes.
