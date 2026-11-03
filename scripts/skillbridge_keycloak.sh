@@ -15,6 +15,13 @@
 # Google's OAuth client must have this redirect URI registered:
 #   https://auth.sentpul.click/realms/data-platform/broker/google/endpoint
 #
+# EXISTING LOCAL ACCOUNTS need one manual check. Auto-linking a Google identity
+# to an account that already exists in Keycloak keeps that account's
+# emailVerified flag. If it is false, Keycloak's ID token says
+# email_verified=false and the app (correctly) refuses to link it. Set the
+# account to Email verified in the Keycloak admin UI once before its first
+# Google sign-in; accounts created BY the broker get it from trustEmail.
+#
 # Usage:
 #   ./scripts/skillbridge_keycloak.sh
 #   KC_PORT_FORWARD=1 ./scripts/skillbridge_keycloak.sh
