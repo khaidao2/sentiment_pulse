@@ -152,6 +152,50 @@ with DAG(
         ],
     )
 
+    # The vocabulary's SPELLINGS, so the web app can read a CV without a model.
+    #
+    # `skills` carries 113 display names and nothing else, which meant the
+    # application could only recognise a skill written exactly as the
+    # dictionary displays it: a CV saying "k8s", "postgres" or "golang" named
+    # a real skill the app could not see, and one model call stood between a
+    # learner and the plainest evidence in their own document.
+    #
+    # Same shape as sync_skill_prerequisites and for the same reasons: the
+    # source is the dictionary in git rather than the warehouse, so it does
+    # not depend on the crawl -- but it DOES depend on `skills` being
+    # populated, which sync_jobs does, and a term whose skill has no row yet
+    # is skipped and named rather than invented.
+    #
+    # Full reconcile including DELETEs: an alias retracted from the dictionary
+    # must stop matching CVs, which an upsert alone would not do.
+    sync_terms = KubernetesPodOperator(
+        task_id="sync_skill_terms",
+        name="skill-terms",
+        namespace="airflow",
+        image="ghcr.io/khaidao2/sentiment-pulse-reverse-etl:latest",
+        image_pull_policy="Always",
+        cmds=["python"],
+        arguments=["sync_skill_terms.py", "--apply"],
+        in_cluster=True,
+        get_logs=True,
+        on_finish_action="delete_pod",
+        startup_timeout_seconds=600,
+        container_resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "50m", "memory": "128Mi"},
+            limits={"cpu": "500m", "memory": "256Mi"},
+        ),
+        env_vars=[
+            k8s.V1EnvVar(
+                name="POSTGRES_DSN",
+                value_from=k8s.V1EnvVarSource(
+                    secret_key_ref=k8s.V1SecretKeySelector(
+                        name="webapp-postgres-credentials", key="dsn"
+                    )
+                ),
+            ),
+        ],
+    )
+
     # Model-inferred job->skill edges.
     #
     # A DELIBERATE DEVIATION, flagged rather than buried: this was asked for at
@@ -236,4 +280,4 @@ with DAG(
         ],
     )
 
-    sync >> [classify_roles, sync_prerequisites, match_ai]
+    sync >> [classify_roles, sync_prerequisites, sync_terms, match_ai]
