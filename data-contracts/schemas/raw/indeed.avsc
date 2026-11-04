@@ -1,0 +1,252 @@
+{
+  "type": "record",
+  "name": "JobPosting",
+  "namespace": "com.indeed.jobs",
+  "doc": "Schema describing a job posting on Indeed Vietnam, read from the SEARCH results page. robots.txt Disallows /viewjob, so the detail page is never fetched and the fields that only exist there are always empty: responsibilities, skills, nice_to_have, tech_stack, min_years_experience, company_type, company_size, company_industry, working_days, overtime_policy. Same field names as itviec and careerviet so the bronze/silver models and the reverse ETL are shared.",
+  "fields": [
+    {
+      "name": "title",
+      "type": "string",
+      "doc": "Job title as Indeed displays it. E.g. 'Data Engineer (Junior/ Fresher)'."
+    },
+    {
+      "name": "company_name",
+      "type": "string",
+      "doc": "Name of the hiring company."
+    },
+    {
+      "name": "company_url",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Link to the company page on Indeed (/cmp/...). Null if the card has none."
+    },
+    {
+      "name": "salary_type",
+      "type": {
+        "type": "enum",
+        "name": "SalaryType",
+        "doc": "How the salary is expressed.",
+        "symbols": [
+          "RANGE",
+          "FIXED",
+          "FROM",
+          "UP_TO",
+          "NEGOTIABLE"
+        ]
+      },
+      "default": "NEGOTIABLE",
+      "doc": "Salary disclosure type: RANGE = min-max, FIXED = single value, FROM = at least min, UP_TO = at most max, NEGOTIABLE = not disclosed. When NEGOTIABLE, the salary_*_usd fields are null."
+    },
+    {
+      "name": "salary_min_usd",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Minimum MONTHLY salary in the unit named by `currency`. Indeed publishes a period (YEARLY/MONTHLY/WEEKLY/DAILY/HOURLY) which the parser converts to monthly; a result below a plausibility floor is dropped to null and the posting becomes NEGOTIABLE, because Indeed's extractor mislabels periods."
+    },
+    {
+      "name": "salary_max_usd",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Maximum MONTHLY salary in the unit named by `currency`. Same conversion and floor as salary_min_usd."
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "default": "USD",
+      "doc": "The unit the salary_*_usd numbers are in. 'VND' for Vietnamese postings; no FX rate is invented here."
+    },
+    {
+      "name": "location",
+      "type": "string",
+      "doc": "Work location / address."
+    },
+    {
+      "name": "work_arrangement",
+      "type": {
+        "type": "enum",
+        "name": "WorkArrangement",
+        "doc": "Work arrangement type.",
+        "symbols": [
+          "AT_OFFICE",
+          "REMOTE",
+          "HYBRID"
+        ]
+      },
+      "doc": "AT_OFFICE unless the card is flagged remote. HYBRID is never emitted: a search card does not say."
+    },
+    {
+      "name": "posted_days_ago",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Days since the card's pubDate epoch. Null when the card carries no date."
+    },
+    {
+      "name": "company_type",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Company type. E.g. 'IT Product', 'Outsourcing'."
+    },
+    {
+      "name": "company_industry",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Industry of the company. E.g. 'E-commerce'."
+    },
+    {
+      "name": "company_size",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Headcount range. E.g. '1-50 employees'."
+    },
+    {
+      "name": "country",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Country where the company is based. E.g. 'Vietnam'."
+    },
+    {
+      "name": "working_days",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Working days of the week. E.g. 'Monday - Friday'."
+    },
+    {
+      "name": "overtime_policy",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Overtime policy. E.g. 'No OT'."
+    },
+    {
+      "name": "min_years_experience",
+      "type": [
+        "null",
+        "int"
+      ],
+      "default": null,
+      "doc": "Minimum years of experience required. E.g. 5."
+    },
+    {
+      "name": "job_domain",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Business domain of the role. E.g. 'FinTech', 'E-commerce'."
+    },
+    {
+      "name": "tech_stack",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Always empty: a search card carries no technology list."
+    },
+    {
+      "name": "description",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "The card's snippet -- a TRUNCATED description. When Indeed cut it, the text ends with an explicit truncation marker, so a clipped advert is distinguishable from a short one."
+    },
+    {
+      "name": "responsibilities",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Always empty: only the Disallowed detail page lists them."
+    },
+    {
+      "name": "skills",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Always empty: only the Disallowed detail page lists them. Downstream skill extraction sees `description` alone."
+    },
+    {
+      "name": "nice_to_have",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Always empty: only the Disallowed detail page lists them."
+    },
+    {
+      "name": "benefits",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "From the card's rankedBenefits, the one list a search card does carry. Often empty."
+    },
+    {
+      "name": "job_url",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "Canonical detail URL, https://vn.indeed.com/viewjob?jk={jobkey} -- the natural key. STORED ONLY; robots forbids fetching it."
+    },
+    {
+      "name": "job_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "doc": "SHA-256 hex digest of job_url. Stable dedup key for the silver layer (one row per job_id, keep the row with the latest crawled_at). Null when job_url is null."
+    },
+    {
+      "name": "crawled_at",
+      "type": "string",
+      "default": "",
+      "doc": "ISO-8601 UTC timestamp (e.g. '2026-07-10T02:15:30Z') of when this page was crawled. Version column for downstream dedup: keep the latest crawled_at per job_id."
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "default": "indeed",
+      "doc": "Origin site of the posting. Always 'indeed' here."
+    }
+  ]
+}

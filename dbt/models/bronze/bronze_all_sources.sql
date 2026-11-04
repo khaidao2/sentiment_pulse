@@ -15,7 +15,7 @@
 
 select *
 from s3(
-    '{{ env_var("BRONZE_S3_URL_ALL", "http://minio.database.svc.cluster.local:9000/sentiment-pulse-raw/{itviec,topcv,careerviet}/*/*.parquet") }}',
+    '{{ env_var("BRONZE_S3_URL_ALL", "http://minio.database.svc.cluster.local:9000/sentiment-pulse-raw/{itviec,topcv,careerviet,indeed}/*/*.parquet") }}',
     '{{ env_var("MINIO_ACCESS_KEY") }}',
     '{{ env_var("MINIO_SECRET_KEY") }}',
     'Parquet'
