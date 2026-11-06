@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: indeed-sink
-          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-7bd8d4c
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-d1967c5
           imagePullPolicy: Always
           command: ["python", "-m", "api_crawler.sink"]
           env:
