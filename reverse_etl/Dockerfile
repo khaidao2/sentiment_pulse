@@ -10,9 +10,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # NOTE: this is an explicit allowlist, not `COPY . .`. A new sync script that
 # is not named here builds green and then fails at runtime with
-# "can't open file", which is exactly what happened to sync_job_roles.py.
-# Adding a script to reverse_etl/ means adding it to this line too.
-COPY sync_jobs.py sync_courses.py sync_course_skills.py sync_job_roles.py sync_skill_prerequisites.py backfill_skills.py backfill_requirements.py ./
+# "can't open file". That has now happened THREE times: sync_job_roles.py
+# first, then sync_skill_terms.py and match_jobs_ai.py, which ran daily
+# against a missing file for three days while their own unit tests passed --
+# the tests import the module from the repo, where it has always existed.
+#
+# Adding a script to reverse_etl/ means adding it to this line too, and
+# tests/test_image_manifest.py now FAILS when it is forgotten rather than
+# leaving the next person to find out from a red DAG.
+COPY sync_jobs.py sync_courses.py sync_course_skills.py sync_job_roles.py sync_skill_prerequisites.py sync_skill_terms.py match_jobs_ai.py backfill_skills.py backfill_requirements.py ./
 # the skill dictionary + extractor; without this the image still imports
 # `skills` and dies at startup
 COPY skills/ ./skills/
