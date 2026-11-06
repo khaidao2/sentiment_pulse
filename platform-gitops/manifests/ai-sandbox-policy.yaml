@@ -37,7 +37,7 @@ data:
     # Only these purposes exist. A model call with no declared purpose is a model
     # call nobody reviewed, and "we also use it for X" is how the evidence path
     # gets reached by accident.
-    declared_purposes := {"cv_skill_extraction", "cover_letter_drafting"}
+    declared_purposes := {"cv_skill_extraction", "cover_letter_drafting", "cv_review"}
     
     # A letter may name ONLY skills the candidate confirmed, so the purposes that
     # tolerate a stray name and the purposes that do not have to be distinguishable
@@ -46,6 +46,15 @@ data:
     # letter it is a FALSE CLAIM ABOUT A PERSON, sent to an employer under their
     # name, and there is no downstream check that makes it cheap.
     strict_purposes := {"cover_letter_drafting"}
+    
+    # A review's findings are counted, not named: `response` holds one entry per
+    # finding -- the finding's AREA when its quote was verified against the CV, and
+    # the literal "unquoted" when it was not. "unquoted" is deliberately absent
+    # from the caller's allow-list (REVIEW_AREAS in cv_review.py), so it lands in
+    # `rejected` and the majority rule below applies to it with no new rule: a
+    # reply whose findings mostly quote text the CV does not contain is refused
+    # whole, exactly as an extraction that ignored the vocabulary is.
+    review_purposes := {"cv_review"}
     
     # A CV longer than this is a pasted document rather than a profile. Bounded
     # because cost and latency scale with it, and because the useful signal is in
@@ -93,6 +102,12 @@ data:
     	count(input.allowed) == 0
     }
     
+    # A review with more findings than this is a rewrite, and a wall of advice is
+    # a wall nobody acts on. Mirrors MAX_FINDINGS in cv_review.py: the Python
+    # constant bounds the PROMPT and this one bounds what may be BELIEVED, the same
+    # split max_input_chars already has with MAX_CV_CHARS.
+    max_review_findings := 8
+    
     # A drafted letter longer than this is not a cover letter. Bounded on the
     # RESPONSE side as well as the request side, because the failure mode that
     # matters here is a model that keeps writing -- and the more it writes about a
@@ -134,10 +149,45 @@ data:
     # A reply that is mostly outside the vocabulary means the model ignored the
     # allow-list. Filtering would leave a plausible-looking remainder from a reply
     # that should not be trusted at all, so the whole thing is refused.
+    #
+    # A REVIEW IS EXCLUDED and has its own version below, because the arithmetic
+    # here does not hold for it. `rejected` is a SET of names: five findings that
+    # all failed their quote check collapse to the single name "unquoted", so
+    # count(rejected) would be 1 against a response of 5 and this rule would never
+    # fire for the case it exists to catch. A review's denominator is a count of
+    # FINDINGS, which means counting the list.
     response_denials contains msg if {
+    	not input.purpose in review_purposes
     	count(input.response) > 0
     	count(rejected) * 2 > count(input.response)
     	msg := sprintf("%d of %d names are outside the vocabulary; the allow-list was ignored", [count(rejected), count(input.response)])
+    }
+    
+    # ---------------------------------------------------------------------------
+    # Gate 2, for a review: findings must quote the document
+    # ---------------------------------------------------------------------------
+    #
+    # WHAT `response` MEANS FOR A REVIEW. One entry per finding: the finding's area
+    # when the caller verified its quote against the CV, and "unquoted" when it
+    # could not. So this is the rule that enforces the condition ScoreCvQuality set
+    # before any model was allowed near a CV -- "its findings would have to quote
+    # the CV".
+    
+    # Counted over the LIST for the reason given above. A repeated area is also a
+    # real repetition -- two `evidence` findings are two findings, not one vote.
+    _unquoted_findings := count([x | some x in input.response; lower(x) == "unquoted"])
+    
+    response_denials contains msg if {
+    	input.purpose in review_purposes
+    	count(input.response) > 0
+    	_unquoted_findings * 2 > count(input.response)
+    	msg := sprintf("%d of %d findings quote text that is not in the CV; a review may only quote the document", [_unquoted_findings, count(input.response)])
+    }
+    
+    response_denials contains msg if {
+    	input.purpose in review_purposes
+    	count(input.response) > max_review_findings
+    	msg := sprintf("the review returned %d findings, over the %d limit", [count(input.response), max_review_findings])
     }
     
     # ---------------------------------------------------------------------------

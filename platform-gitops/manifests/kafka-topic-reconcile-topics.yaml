@@ -23,5 +23,6 @@ data:
   topics: |
     sentiment-pulse.careerviet:1:1
     sentiment-pulse.courses:1:1
+    sentiment-pulse.indeed:1:1
     sentiment-pulse.itviec:1:1
     sentiment-pulse.topcv:1:1

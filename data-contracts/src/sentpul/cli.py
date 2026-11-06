@@ -49,6 +49,7 @@ def _producer_context(c: Contract) -> dict:
         "image": a["image"],
         "command": a["command"],
         "resources": resources,
+        "nodes": a.get("nodes") or [],
         "env": _producer_env(c),
         "env_from_secrets": a.get("env_from_secrets", []),
     }

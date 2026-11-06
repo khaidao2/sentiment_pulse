@@ -1,0 +1,58 @@
+name: indeed
+kind: producer
+schema_file: data-contracts/schemas/raw/indeed.avsc
+
+apicurio:
+  group_id: sentiment-pulse
+  artifact_id: indeed-schema
+  type: AVRO
+
+kafka:
+  topic: sentiment-pulse.indeed
+  bootstrap_servers: kafka.kafka.svc.cluster.local:9092
+
+sink:
+  clickhouse:
+    table: indeed
+    database: default
+
+# Per-source scraping knobs. sent-gen turns each key into an env var
+# (UPPER_CASE) on the generated DAG's pod; the crawler reads them via
+# api_crawler/jobs/indeed/config.py. This YAML is the single source of truth —
+# the crawler never parses it, it only reads the injected env.
+#
+# WHY THIS SOURCE IS QUERY-DRIVEN, AND SHALLOW. Indeed has no IT-only listing
+# page, so the crawl is a list of searches — and each search yields only its
+# first page, because Indeed answers anonymous pagination with a login page.
+# It also reads SEARCH PAGES ONLY: vn.indeed.com robots.txt Disallows /viewjob,
+# so there is no detail fetch and a record holds what a result card holds —
+# see the schema's doc field. Expect ~15 postings per query, not hundreds.
+crawler:
+  search_url: https://vn.indeed.com/jobs
+  queries: >-
+    data engineer,backend developer,frontend developer,devops engineer,
+    data analyst,software engineer,business analyst,mobile developer
+  location: ""
+  max_pages: 1           # Indeed serves its SIGN-IN page for start>=10 to an
+                         # anonymous client, so page two is not available
+                         # without crawling as a logged-in user. ~15 cards per
+                         # query; breadth comes from the query list above.
+  delay: 15.0            # Indeed 403s after ~6 pages from one address; at one
+                         # page per query the whole crawl is still ~2 minutes
+  backoff: 60.0          # first wait after a refusal; the retry waits twice it
+  attempts: 3            # per page, so a block costs minutes, not the query
+
+airflow:
+  schedule: "30 2 * * *"   # after itviec (02:00), before the transform window
+  namespace: airflow
+  image: ghcr.io/khaidao2/sentiment-pulse-crawler:latest
+  command: "cd /app && python -m api_crawler.jobs.indeed"
+  # Either node may run this pod. Both have their own route to the internet, so
+  # letting the scheduler pick spreads the crawl's egress across two addresses
+  # instead of hammering one — which is what gets a crawler rate-limited.
+  nodes:
+    - fedora
+    - khaibaai
+  resources:
+    cpu: "500m"
+    memory: "512Mi"

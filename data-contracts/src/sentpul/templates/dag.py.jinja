@@ -41,7 +41,29 @@ with DAG(
             requests={"cpu": "50m", "memory": "128Mi"},
             limits={"cpu": "{{ resources.cpu }}", "memory": "{{ resources.memory }}"},
         ),
-{% if env or env_from_secrets %}        env_vars=[
+{% if nodes %}        # Which nodes may run this pod (contract: airflow.nodes). Listing more
+        # than one does NOT pin the pod -- the scheduler still chooses, so a
+        # crawl's egress is spread over those nodes' addresses instead of
+        # always leaving by the same one. A node that is cordoned or gone drops
+        # out of the set on its own; an empty `nodes` means no constraint.
+        affinity=k8s.V1Affinity(
+            node_affinity=k8s.V1NodeAffinity(
+                required_during_scheduling_ignored_during_execution=k8s.V1NodeSelector(
+                    node_selector_terms=[
+                        k8s.V1NodeSelectorTerm(
+                            match_expressions=[
+                                k8s.V1NodeSelectorRequirement(
+                                    key="kubernetes.io/hostname",
+                                    operator="In",
+                                    values=[{% for n in nodes %}"{{ n }}"{{ ", " if not loop.last }}{% endfor %}],
+                                )
+                            ]
+                        )
+                    ]
+                )
+            )
+        ),
+{% endif %}{% if env or env_from_secrets %}        env_vars=[
 {% for e in env %}            k8s.V1EnvVar(name="{{ e.name }}", value="{{ e.value }}"),
 {% endfor %}{% for e in env_from_secrets %}            k8s.V1EnvVar(
                 name="{{ e.env_var }}",
