@@ -14,3 +14,7 @@ __pycache__/
 
 # Local build notes (not part of the repo)
 data-contracts/docs/
+# Editable installs of data-contracts (`pip install -e data-contracts`) write
+# this beside the source. The CI test job does exactly that, and so does anyone
+# running the crawler suite locally.
+*.egg-info/

@@ -12,7 +12,10 @@ on:
     # Only rebuild when something that lands in the image changes.
     paths:
       - "api_crawler/**"
-      - "data-contracts/schemas/**"
+      # The whole package, not just schemas/: the crawler suite imports
+      # sentpul.cli, so a change in data-contracts/src can break these tests
+      # without touching a schema.
+      - "data-contracts/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/build-image.yml"
@@ -23,7 +26,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"       # the image's base, so imports match
+          cache: pip
+
+      # `data-contracts` is installed because the crawler suite reaches into
+      # it: tests/test_sink_image_pin.py imports sentpul.cli, and the contract
+      # tests need the pyyaml/click it brings. Installing the package rather
+      # than guessing at its dependencies is what keeps this honest when that
+      # pyproject changes.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api_crawler/requirements.txt pytest
+          pip install -e data-contracts
+
+      - name: Test
+        working-directory: api_crawler
+        run: python -m pytest tests -q
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write        # write back the pinned image tag to the sink manifest

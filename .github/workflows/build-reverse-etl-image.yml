@@ -3,6 +3,15 @@ name: build-reverse-etl-image
 # Builds the reverse-ETL runner image (ClickHouse -> Postgres upsert) and pushes
 # it to GHCR on every push to main that touches reverse_etl/. The reverse_etl
 # Airflow DAG runs this image.
+#
+# THE TESTS GATE THE BUILD, and that ordering is the whole point of the `test`
+# job below. Nothing ran this suite before, which is how sync_skill_terms.py
+# and match_jobs_ai.py shipped MISSING from the image and then failed daily for
+# three days -- with their own unit tests passing the entire time, because a
+# test imports the module from the repository and never from the image.
+# tests/test_image_manifest.py closes that specific hole, but a test nobody
+# runs closes nothing, so `build` now needs `test`: a red suite publishes no
+# image rather than publishing a broken one and waiting for a red DAG.
 
 on:
   push:
@@ -17,7 +26,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"       # the image's base, so imports match
+          cache: pip
+
+      # requirements.txt is the RUNTIME set the image installs; pytest is the
+      # only addition. There is no dev-requirements file on purpose -- a second
+      # list is a second thing to drift from the image.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r reverse_etl/requirements.txt pytest
+
+      - name: Test
+        working-directory: reverse_etl
+        run: python -m pytest tests -q
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       packages: write
