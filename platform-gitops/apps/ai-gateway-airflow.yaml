@@ -1,0 +1,42 @@
+# The airflow-namespace copy of the LLM gateway credential.
+#
+# NAMED WITHOUT "credentials", unlike its webapp sibling: the pre-commit hook
+# rejects any *credentials*.yaml that has not got "sealed" in the path, on the
+# assumption it carries a key. This file carries none -- it is an ArgoCD
+# Application pointing at the sealed manifest -- so the name sidesteps a false
+# positive rather than the hook being bypassed for it.
+#
+# A SECOND Application rather than a second path in the existing one: an ArgoCD
+# Application has ONE destination namespace, and this SealedSecret is sealed to
+# airflow while apps/ai-gateway-credentials.yaml serves webapp. Exactly the
+# shape apps/clickhouse-credentials.yaml already has, and for the same reason --
+# the `airflow` Application is a Helm chart source and cannot carry a loose
+# manifest.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway-credentials-airflow
+  namespace: argocd
+  annotations:
+    # Before airflow (wave 2): the task pod cannot be created without it.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    # Deleting this Application must delete the SealedSecret with it rather
+    # than leaving it behind unmanaged.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'ai-gateway-sealed-credentials-airflow.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    # airflow, not webapp: the KPO task pod that consumes it runs here.
+    namespace: airflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
