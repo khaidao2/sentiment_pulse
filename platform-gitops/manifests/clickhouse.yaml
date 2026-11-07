@@ -40,7 +40,10 @@ spec:
             - name: CLICKHOUSE_USER
               value: "clickhouse"
             - name: CLICKHOUSE_PASSWORD
-              value: "clickhousepassword"
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-server-sealed
+                  key: CLICKHOUSE_PASSWORD
             - name: CLICKHOUSE_DB
               value: "default"
           resources:

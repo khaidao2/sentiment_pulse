@@ -11,10 +11,9 @@ config:
     upstreams = [
         "http://airflow-api-server.airflow.svc.cluster.local:8080"
     ]
-    email_domains = ["*"]
     set_xauthrequest = true
     pass_user_headers = true
-    cookie_secure = false # Tắt HTTPS requirement cho local dev
+    cookie_secure = true
 
 resources:
   requests:
@@ -30,3 +29,13 @@ ingress:
   path: /
   hosts:
     - airflow.sentpul.click
+
+# Access is restricted to an explicit allowlist, not a domain: both accounts
+# share a provider, so a domain filter would admit the whole internet. The list
+# lives in the in-cluster ConfigMap "oauth2-proxy-allowed-emails" (key restricted_user_access) and is
+# deliberately NOT in git -- these are real personal addresses and this repo is
+# public. Edit it with: kubectl -n <ns> edit configmap oauth2-proxy-allowed-emails
+authenticatedEmailsFile:
+  enabled: true
+  persistence: configmap
+  template: oauth2-proxy-allowed-emails
