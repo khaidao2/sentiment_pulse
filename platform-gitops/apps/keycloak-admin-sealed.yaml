@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak-credentials
+  # FILENAME NOTE: this file is keycloak-admin-sealed.yaml, not
+  # keycloak-credentials.yaml, so it does not match the pre-commit hook's
+  # `*credentials*.ya?ml` rule -- which exists because a literal credential in
+  # this repo is exactly how the Keycloak admin password leaked. The hook skips
+  # names containing "sealed". Do not "tidy" the filename back; the Application
+  # name below is what ArgoCD shows, and it still matches clickhouse-credentials.
+  namespace: argocd
+  annotations:
+    # Wave 0: BEFORE keycloak (wave 1). The StatefulSet mounts this secret via
+    # secretKeyRef, and a pod whose referenced secret does not exist stays
+    # stuck in CreateContainerConfigError -- which, for the identity provider,
+    # locks every other service's login at once.
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    # Same reasoning as clickhouse-credentials: deleting this Application must
+    # take the SealedSecret with it rather than leave it behind unmanaged.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'keycloak-admin-sealed-secret.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: keycloak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

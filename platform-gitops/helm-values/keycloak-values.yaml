@@ -20,7 +20,13 @@ extraEnvVars:
 
 auth:
   adminUser: admin
-  adminPassword: adminpassword
+  # The password is NOT here. It used to be, in plaintext, in a public repo --
+  # see manifests/keycloak-admin-sealed-secret.yaml for what that exposed.
+  # Chart 15.1.4 resolves these two through keycloak.secretName/secretKey in
+  # _helpers.tpl; passwordSecretKey is stated explicitly rather than relying on
+  # the "admin-password" default, so a chart bump cannot change it silently.
+  existingSecret: keycloak-admin
+  passwordSecretKey: admin-password
 
 image:
   repository: bitnamilegacy/keycloak
