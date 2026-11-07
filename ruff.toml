@@ -1,0 +1,44 @@
+# Code convention for the Python in this repo, enforced by the `lint` job in
+# .github/workflows/ci.yml and runnable locally with `ruff check .`.
+#
+# Scope note: `code/` is an unrelated project parked in this tree (see
+# .gitignore) and `mutants/` is mutmut's generated working copy. Neither is
+# ours to lint, so both are excluded rather than silenced rule-by-rule.
+
+line-length = 100
+target-version = "py312"
+
+extend-exclude = [
+    "code",
+    "mutants",
+    ".venv-mutmut",
+    "dbt",
+]
+
+[lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes: undefined names, unused imports
+    "I",        # import order, so diffs stop churning on import blocks
+    "UP",       # pyupgrade: keep to 3.12 syntax, the image's base
+    "B",        # bugbear: mutable defaults, zip(strict=), raise-from
+    "SIM",      # obvious simplifications
+    "C4",       # comprehension clarity
+]
+
+# E501 is reported by the formatter's own wrapping decisions more often than it
+# signals a real problem, and three existing lines are long because they hold a
+# URL or a selector that must not be split. Line length stays configured above
+# so `ruff format` still wraps at 100; it just is not a CI failure.
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# Tests assert on literal fixtures and build deliberately awkward inputs; and a
+# composition root is allowed to import everything it wires together.
+"**/tests/**" = ["B011", "E402"]
+"**/__main__.py" = ["E402"]
+
+[lint.isort]
+# These are installed as top-level packages (the images set WORKDIR to the
+# package dir), so ruff cannot infer them from the layout.
+known-first-party = ["api_crawler", "sentpul", "skills", "courses", "roles", "jobs"]
