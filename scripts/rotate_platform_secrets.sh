@@ -417,10 +417,16 @@ oidc = re.compile(r'\n\s+- name: MINIO_IDENTITY_OPENID_CLIENT_SECRET\n\s+value:.
 assert oidc.search(s), 'MINIO_IDENTITY_OPENID_CLIENT_SECRET not found where expected'
 s = oidc.sub('', s, count=1)
 m = pat.search(s)   # offsets moved after that removal
+# `env:` MUST be re-opened. The regex above consumes the `env:` key along with
+# the two root entries, but other env entries follow it -- leaving them as
+# children of `envFrom:`, which only accepts secretRef/configMapRef. The API
+# server then rejects the Deployment with "must specify one of configMapRef or
+# secretRef" and ArgoCD retries forever. That is what happened on the first run.
 repl = (f'\n{ind}# Root credentials come from a SealedSecret. They were literals here, in a\n'
         f'{ind}# public repo. The sinks and transform DAGs read the separate\n'
         f'{ind}# `minio-credentials` secret, which must be rotated in step with this one.\n'
-        f'{ind}envFrom:\n{ind}  - secretRef:\n{ind}      name: minio-root-sealed\n')
+        f'{ind}envFrom:\n{ind}  - secretRef:\n{ind}      name: minio-root-sealed\n'
+        f'{ind}env:\n')
 p.write_text(s[:m.start()] + repl + s[m.end():])
 print('  minio.yaml rewritten')
 PY
@@ -500,6 +506,15 @@ for f in "$MF"/*sealed*.yaml; do
   kubectl apply --dry-run=server -f "$f" >/dev/null 2>&1 || die "server dry-run rejected $f"
 done
 ok "sealed manifests accepted by the API server"
+# Every manifest this change edited must also be accepted, not just the sealed
+# ones. A structurally invalid Deployment passes `yaml.safe_load` happily and is
+# only rejected by the API server -- where it becomes an endless ArgoCD retry.
+for f in "$MF"/*.yaml; do
+  [ -f "$f" ] || continue
+  kubectl apply --dry-run=server -f "$f" >/dev/null 2>&1 \
+    || die "the API server REJECTS $f -- do not commit it; ArgoCD would retry forever. Run: kubectl apply --dry-run=server -f $f"
+done
+ok "every manifest accepted by the API server"
 
 # ======================================================== 8. commit + PR ====
 step "8/10  commit, PR$( [ "$DO_MERGE" = 1 ] && echo ', merge' )"

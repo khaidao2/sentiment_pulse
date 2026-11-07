@@ -55,6 +55,7 @@ spec:
           envFrom:
             - secretRef:
                 name: minio-root-sealed
+          env:
             # Public URL, not the in-cluster Service. MinIO BLOCKS startup until
             # OpenID initialises, so an unreachable issuer means it never opens
             # :9000/:9001 at all -> 502 at the tunnel. Cross-node pod traffic was
