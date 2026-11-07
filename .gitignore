@@ -18,3 +18,17 @@ data-contracts/docs/
 # this beside the source. The CI test job does exactly that, and so does anyone
 # running the crawler suite locally.
 *.egg-info/
+
+# The AST index and the mutation-testing venv are local tooling state. `.venv/`
+# above does not cover `.venv-mutmut/`, and pip's own venv .gitignore only
+# hides it from THIS clone, not from a fresh one.
+.code-graph/
+.venv-mutmut/
+# mutmut's working copy of the tree. Large, regenerated on every run.
+mutants/
+.mutmut-cache
+
+# An unrelated project someone parked here (~42MB, ~1600 .py files). It is not
+# part of this repo and must never be swept in by `git add -A`. Remove this
+# line only when the directory itself is gone.
+/code/

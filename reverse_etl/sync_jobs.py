@@ -20,7 +20,7 @@ Env:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import clickhouse_connect
 import psycopg
@@ -43,6 +43,26 @@ JOB_COLS = [
 # the target column is `requirements` and the mapping is explicit here rather
 # than renaming a pipeline column everything else already reads.
 SOURCE_COL = {"requirements": "skills"}
+# Pipeline-owned sighting columns (migration 20261107091000). Deliberately NOT in
+# JOB_COLS: they are written by their own guarded clause, never by the blanket
+# `col = EXCLUDED.col` that JOB_COLS get.
+#
+# OWNERSHIP: this module must never write jobs.is_active or jobs.expires_at.
+# Those are WEB-owned (migration 20260715180000); "not seen lately" is derived
+# from last_seen_at by the web at read time, so nothing here decides a job is
+# closed.
+SIGHTING_COLS = ["first_seen_at", "last_seen_at"]
+# The forward-only guard, shared by the upsert and the unchanged-job UPDATE so
+# the two cannot drift. It lives in SQL, not in Python, because two overlapping
+# runs (a retry racing a manual backfill) would both read the old value and the
+# later writer would win with whatever it computed. GREATEST/LEAST are evaluated
+# against the row's committed value under the row lock, so the result is the same
+# in any order. Postgres ignores NULL arguments in both, which is how a first
+# sighting replaces the column's NULL ("unknown") without a CASE.
+_SIGHTING_GUARD = (
+    "first_seen_at = LEAST(jobs.first_seen_at, EXCLUDED.first_seen_at), "
+    "last_seen_at = GREATEST(jobs.last_seen_at, EXCLUDED.last_seen_at)"
+)
 # Company attributes, deduped into the companies table on `name`.
 COMPANY_COLS = ["company_name", "company_url", "company_industry", "country"]
 # Array attribute -> (lookup table, its id col, junction table, its fk col).
@@ -108,18 +128,43 @@ def _upsert_company(cur, name, url, industry, country):
     return cur.fetchone()[0]
 
 
-def _upsert_job(cur, row, company_id):
-    cols = ["company_id"] + JOB_COLS
-    vals = [company_id] + [row[SOURCE_COL.get(c, c)] for c in JOB_COLS]
-    updatable = [c for c in cols if c != "job_id"]
+def _upsert_job(cur, row, company_id, seen=(None, None)):
+    """UPSERT one job. `seen` is (first, last) sighting, either may be None."""
+    cols = ["company_id"] + JOB_COLS + SIGHTING_COLS
+    vals = [company_id] + [row[SOURCE_COL.get(c, c)] for c in JOB_COLS] + list(seen)
+    updatable = [c for c in cols if c != "job_id" and c not in SIGHTING_COLS]
     cur.execute(
         f"INSERT INTO jobs ({', '.join(cols)}) "
         f"VALUES ({', '.join(['%s'] * len(cols))}) "
         f"ON CONFLICT (job_id) DO UPDATE SET "
         + ", ".join(f"{c} = EXCLUDED.{c}" for c in updatable)
-        + ", updated_at = now()",
+        + f", {_SIGHTING_GUARD}, updated_at = now()",
         vals,
     )
+
+
+def _touch_sighting(cur, job_id, seen):
+    """Record a sighting for a job whose CONTENT did not change.
+
+    Such a job is absent from silver_current's changed slice (silver_history
+    collapses identical re-crawls), so the upsert never sees it, yet being
+    re-crawled unchanged is exactly the evidence that it is still open. Same
+    guard as the upsert; updated_at is left alone because nothing about the
+    posting changed. A job not yet in the target matches no row, which is fine:
+    its first upsert carries the sighting.
+    """
+    cur.execute(
+        "UPDATE jobs SET "
+        "first_seen_at = LEAST(first_seen_at, %s), "
+        "last_seen_at = GREATEST(last_seen_at, %s) "
+        "WHERE job_id = %s",
+        (seen[0], seen[1], job_id),
+    )
+
+
+def _utc(ts):
+    """ClickHouse hands back naive datetimes for a timezone-less column; they are UTC."""
+    return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
 
 
 def _sync_junction(cur, job_id, values, lookup_tbl, lookup_id, junction_tbl, junction_fk):
@@ -156,8 +201,8 @@ def main() -> None:
     # exited 0, and Airflow recorded success while writing zero rows. A cold
     # first sync could never happen. Verified against the live table: with the
     # look-back 0 rows, without it 1046.
-    _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-    wm = watermark if watermark.tzinfo else watermark.replace(tzinfo=timezone.utc)
+    _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+    wm = watermark if watermark.tzinfo else watermark.replace(tzinfo=UTC)
     lower_bound = max(wm - timedelta(days=1), _EPOCH)
 
     # 2. pull only the changed slice from ClickHouse. crawled_at is a String in
@@ -173,9 +218,24 @@ def main() -> None:
         "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s)",
         parameters={"wm": lower_bound.isoformat()},
     )
-    rows = [dict(zip(result.column_names, r)) for r in result.result_rows]
+    rows = [dict(zip(result.column_names, r, strict=True)) for r in result.result_rows]
 
-    if not rows:
+    # 2b. when each job was actually crawled, from BRONZE and not silver. silver
+    #     keeps one row per content version, so an unchanged posting re-crawled
+    #     daily keeps its old crawled_at there and would look unseen for weeks:
+    #     a false "likely filled" on every stable listing. Bronze has every
+    #     crawl. Same window and predicate as the changed slice above.
+    sighted = ch.query(
+        "SELECT job_id, min(parseDateTimeBestEffort(crawled_at)), "
+        "max(parseDateTimeBestEffort(crawled_at)) FROM bronze_all_sources "
+        "WHERE job_id IS NOT NULL "
+        "AND parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s) "
+        "GROUP BY job_id",
+        parameters={"wm": lower_bound.isoformat()},
+    )
+    sightings = {j: (_utc(first), _utc(last)) for j, first, last in sighted.result_rows}
+
+    if not rows and not sightings:
         print(f"reverse-etl: nothing newer than {lower_bound.isoformat()}")
         return
 
@@ -186,7 +246,7 @@ def main() -> None:
                 cur, row["company_name"], row["company_url"],
                 row["company_industry"], row["country"],
             )
-            _upsert_job(cur, row, company_id)
+            _upsert_job(cur, row, company_id, sightings.get(row["job_id"], (None, None)))
             for arr_col, (ltbl, lid, jtbl, jfk) in ARRAY_COLS.items():
                 values = row[arr_col]
                 if arr_col == "skills":
@@ -204,6 +264,10 @@ def main() -> None:
                     _extraction_stats[0] += len(row.get("skills") or [])
                     _extraction_stats[1] += len(values)
                 _sync_junction(cur, row["job_id"], values, ltbl, lid, jtbl, jfk)
+        changed = {row["job_id"] for row in rows}
+        for job_id, seen in sightings.items():
+            if job_id not in changed:
+                _touch_sighting(cur, job_id, seen)
     pg.commit()
     print(f"reverse-etl: upserted {len(rows)} job(s) (watermark {watermark.isoformat()})")
     print(

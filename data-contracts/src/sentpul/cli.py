@@ -210,7 +210,7 @@ def render(contracts_dir, dry_run) -> None:
             _render_contract(c, dry_run)
         _render_topics(contracts, dry_run)
     except (ContractError, FileNotFoundError) as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from e
 
 
 @main.command()
@@ -231,7 +231,7 @@ def register(contracts_dir) -> None:
             schema_id = client.register_schema(subject, schema)
             click.echo(f"registered {subject} (id={schema_id})")
     except (ContractError, FileNotFoundError, RuntimeError, KeyError) as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from e
 
 
 @main.command()
@@ -248,7 +248,7 @@ def validate(contract_path, data_path) -> None:
             validate_record(r, schema)
         click.echo(f"OK — {len(records)} record(s) valid against '{c.name}'")
     except (ContractError, ValueError, FileNotFoundError) as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from e
 
 
 @main.command(name="run-all")

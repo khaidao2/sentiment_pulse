@@ -1,0 +1,152 @@
+name: ci
+
+# The quality gate that runs BEFORE a merge.
+#
+# build-image.yml and build-reverse-etl-image.yml each gate their own image on
+# their own suite, but both only trigger on `push: main` -- so until now the
+# first time anything ran against a change was after it had already landed.
+# This workflow runs on the pull request, which is the point at which a red
+# result is still cheap to act on. The build workflows keep their test jobs:
+# they gate a publish, which is a different question from gating a merge.
+#
+# Four jobs, cheapest first, so the fastest signal arrives first:
+#   architecture - import-graph rules. No dependencies, seconds.
+#   lint         - ruff. Seconds.
+#   test         - both suites, in parallel.
+#   mutation     - are the tests load-bearing? Minutes, so it runs last.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"   # the images' base, so imports match production
+
+jobs:
+  architecture:
+    name: architecture (layering)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # pytest and nothing else. test_architecture.py reads the import graph
+      # with `ast` and never imports the package, so the layering answer costs
+      # seconds and cannot be masked by a dependency missing in CI.
+      - name: Install pytest
+        run: pip install pytest
+
+      # --noconftest is required, not cosmetic: api_crawler/tests/conftest.py
+      # imports the parsers, so collecting it would pull in bs4 and defeat the
+      # point of a dependency-free job. The same test also runs inside the full
+      # `test` job above, conftest and all, so nothing is skipped overall.
+      - name: Check ports-and-adapters layering
+        run: >-
+          python -m pytest api_crawler/tests/test_architecture.py
+          -q --noconftest -p no:cacheprovider
+        env:
+          PYTHONPATH: .
+
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      # Pinned: a ruff minor release adds rules, and a lint job that fails on
+      # an unrelated day because the tool moved teaches people to ignore it.
+      # Bump this deliberately, with the fixes in the same commit.
+      - name: Install ruff
+        run: pip install ruff==0.17.4
+
+      # Rules and exclusions live in ruff.toml so `ruff check .` locally is the
+      # same command CI runs.
+      - name: Lint
+        run: ruff check --output-format=github .
+
+  test:
+    name: test (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false      # one red suite should not hide the other's result
+      matrix:
+        include:
+          - suite: api_crawler
+            # data-contracts is installed because the crawler suite reaches
+            # into it (tests/test_sink_image_pin.py imports sentpul.cli).
+            # Installing the package beats guessing its dependencies.
+            install: pip install -r api_crawler/requirements.txt pytest && pip install -e data-contracts
+          - suite: reverse_etl
+            install: pip install -r reverse_etl/requirements.txt pytest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          ${{ matrix.install }}
+
+      # Both suites run with their own directory as the working directory: the
+      # images set WORKDIR to the package dir, so the modules are top-level
+      # there and the imports under test match production.
+      - name: Test
+        working-directory: ${{ matrix.suite }}
+        run: python -m pytest tests -q
+
+  mutation:
+    name: mutation (api_crawler)
+    runs-on: ubuntu-latest
+    # A green suite says the tests ran, not that they would notice a change.
+    # This job answers the second question. It is the slowest, so it waits for
+    # the cheap signals rather than burning minutes alongside a failing lint.
+    needs: [architecture, lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api_crawler/requirements.txt pytest mutmut==3.8.1
+          pip install -e data-contracts
+
+      # Scope (which modules are mutated, which suites judge them) is in
+      # setup.cfg under [mutmut], not here, so a local `mutmut run` matches.
+      # --max-children bounds it to the runner's cores; the local run was
+      # ~1400 mutants in about 100s.
+      - name: Run mutation testing
+        run: |
+          mutmut run --max-children 4 || true   # a surviving mutant is not a crash; the gate decides
+          mutmut export-cicd-stats
+
+      - name: Enforce the mutation-score floor
+        run: python scripts/mutation_gate.py
+
+      # The survivor list is what makes a failure actionable, so keep it even
+      # when the gate goes red.
+      - name: Upload mutation stats
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-stats
+          path: mutants/mutmut-cicd-stats.json
+          if-no-files-found: warn

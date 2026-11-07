@@ -8,9 +8,10 @@ so no other module string-builds those by hand.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import yaml
 
@@ -81,7 +82,7 @@ class Contract:
 def load_contract(path: str | Path) -> Contract:
     """Parse and validate a single contract YAML file."""
     path = Path(path)
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     if not isinstance(raw, dict):
         raise ContractError(f"{path}: contract must be a YAML mapping")

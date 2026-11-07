@@ -1,8 +1,9 @@
 """The vocabulary export: every spelling, each with its own scannability."""
 
+from sync_skill_terms import terms
+
 from skills.dictionary import ALL_SKILLS
 from skills.extractor import LOOKUP, normalize
-from sync_skill_terms import terms
 
 
 def test_every_dictionary_spelling_is_exported():

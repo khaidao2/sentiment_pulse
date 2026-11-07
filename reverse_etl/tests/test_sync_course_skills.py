@@ -19,10 +19,10 @@ shape test_sync_jobs.py uses, so the SQL is asserted without a database.
 import sys
 
 import pytest
-
 import sync_course_skills
-from courses import match, overrides as overrides_mod
 
+from courses import match
+from courses import overrides as overrides_mod
 
 # Three courses that cover the matrix: a clean title match, a mentions-only
 # course that must be dropped, and a LEARNING_PATH whose own title says nothing

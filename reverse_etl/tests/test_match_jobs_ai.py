@@ -18,10 +18,10 @@ database and without a model.
 
 import sys
 
-import pytest
-
 import match_jobs_ai
+import pytest
 from match_jobs_ai import _parse, validated
+
 from skills.extractor import normalize
 
 VOCAB = {normalize(a): a for a in
@@ -162,7 +162,7 @@ def test_every_written_edge_is_a_model_edge(run):
     for stmt in stmts:
         assert "'model'" in stmt, "method is not hardcoded to model"
         assert "%s, %s, 'model', %s, %s" in stmt
-    for job_id, sid, conf, why in _inserts(cur.calls):
+    for _job_id, _sid, conf, why in _inserts(cur.calls):
         assert 0.0 <= conf <= 1.0 and why, "confidence and reason are required"
 
 

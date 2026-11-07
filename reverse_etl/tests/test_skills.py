@@ -121,8 +121,8 @@ def test_role_in_tech_stack_is_dropped_but_real_skills_kept():
 
 # 10 — idempotency
 def test_repeated_extraction_is_identical():
-    args = dict(tech_stack=["Python", "k8s"], description="We run Docker and Apache Kafka.",
-                requirements=["Experience with PostgreSQL"])
+    args = {"tech_stack": ["Python", "k8s"], "description": "We run Docker and Apache Kafka.",
+                "requirements": ["Experience with PostgreSQL"]}
     first = extract_skills(**args)
     assert first == extract_skills(**args) == extract_skills(**args)
 

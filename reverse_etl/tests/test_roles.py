@@ -18,8 +18,14 @@ import pytest
 
 import roles.classify as rc
 from roles.classify import (
-    AMBIGUOUS, METHOD, QUALIFIER, ROLE, UNKNOWN,
-    Classification, RoleRulesError, classify,
+    AMBIGUOUS,
+    METHOD,
+    QUALIFIER,
+    ROLE,
+    UNKNOWN,
+    Classification,
+    RoleRulesError,
+    classify,
 )
 
 

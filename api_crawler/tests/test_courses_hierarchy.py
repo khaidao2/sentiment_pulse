@@ -238,7 +238,7 @@ def test_every_record_round_trips_through_the_avro_schema():
         buf.seek(0)
         back = list(fastavro.reader(buf))
         assert len(back) == len(recs)
-        for before, after in zip(recs, back):
+        for before, after in zip(recs, back, strict=True):
             assert after["content_kind"] == before["content_kind"]
             assert after["child_uids"] == before["child_uids"], "order must survive"
             assert after["uid"] == before["uid"]

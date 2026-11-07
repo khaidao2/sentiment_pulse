@@ -21,7 +21,12 @@ import pytest
 import skills.prerequisites as pr
 from skills.dictionary import ALL_SKILLS
 from skills.prerequisites import (
-    CURATED, PROVIDER_ORDER, PrerequisiteError, all_edges, layers, required_by,
+    CURATED,
+    PROVIDER_ORDER,
+    PrerequisiteError,
+    all_edges,
+    layers,
+    required_by,
 )
 
 

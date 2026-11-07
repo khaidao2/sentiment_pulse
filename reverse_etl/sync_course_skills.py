@@ -81,7 +81,8 @@ import os
 
 import psycopg
 
-from courses import match, overrides as overrides_mod
+from courses import match
+from courses import overrides as overrides_mod
 
 # Same guard, same number, same reason as sync_jobs.MAX_LOOKUP_BYTES: `skills`
 # has a UNIQUE index on name and Postgres cannot index a btree row wider than

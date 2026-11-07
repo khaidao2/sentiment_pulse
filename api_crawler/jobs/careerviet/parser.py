@@ -23,8 +23,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
 
 from bs4 import BeautifulSoup, Tag
 
@@ -121,7 +121,7 @@ class CareerVietParser(IParser):
             "benefits": self._benefits(soup, ld),
             "job_url": job_url,
             "job_id": job_id,
-            "crawled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "crawled_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "careerviet",
         }
         yield record
@@ -138,11 +138,11 @@ class CareerVietParser(IParser):
                     return node
         return {}
 
-    def _org_name(self, ld: dict) -> Optional[str]:
+    def _org_name(self, ld: dict) -> str | None:
         org = ld.get("hiringOrganization")
         return org.get("name") if isinstance(org, dict) else None
 
-    def _org_url(self, ld: dict) -> Optional[str]:
+    def _org_url(self, ld: dict) -> str | None:
         org = ld.get("hiringOrganization")
         url = org.get("url") if isinstance(org, dict) else None
         return url or None  # "" -> None
@@ -158,10 +158,10 @@ class CareerVietParser(IParser):
                 return addr
         return {}
 
-    def _country(self, ld: dict) -> Optional[str]:
+    def _country(self, ld: dict) -> str | None:
         return self._address(ld).get("addressCountry") or None
 
-    def _posted_days_ago(self, ld: dict) -> Optional[int]:
+    def _posted_days_ago(self, ld: dict) -> int | None:
         # CareerViet serves a full timestamp ("2026-10-29T09:09:18.141Z"), so
         # take the date part rather than relying on fromisoformat's tz handling.
         ds = ld.get("datePosted")
@@ -172,7 +172,7 @@ class CareerVietParser(IParser):
         except ValueError:
             return None
 
-    def _job_url(self, soup: BeautifulSoup, ld: dict) -> Optional[str]:
+    def _job_url(self, soup: BeautifulSoup, ld: dict) -> str | None:
         """Canonical URL of this posting — the natural key.
 
         Prefer <link rel="canonical">, then og:url, then the JSON-LD url.
@@ -189,7 +189,7 @@ class CareerVietParser(IParser):
             url = u if isinstance(u, str) else None
         return url.strip() if url else None
 
-    def _min_years_experience(self, ld: dict) -> Optional[int]:
+    def _min_years_experience(self, ld: dict) -> int | None:
         exp = ld.get("experienceRequirements")
         if isinstance(exp, dict) and isinstance(exp.get("monthsOfExperience"), int):
             return exp["monthsOfExperience"] // 12
@@ -198,7 +198,7 @@ class CareerVietParser(IParser):
     # ── salary ─────────────────────────────────────────────────────────────
     def _salary(
         self, soup: BeautifulSoup, ld: dict
-    ) -> tuple[str, Optional[int], Optional[int], str]:
+    ) -> tuple[str, int | None, int | None, str]:
         """(salary_type, min, max, currency).
 
         JSON-LD baseSalary is authoritative: a disclosed range arrives as
@@ -239,7 +239,7 @@ class CareerVietParser(IParser):
             return "FIXED", single, single, currency
         return "NEGOTIABLE", None, None, currency
 
-    def _usd(self, amount, rate: float) -> Optional[int]:
+    def _usd(self, amount, rate: float) -> int | None:
         """Convert a native-currency amount to whole USD; None if unusable."""
         try:
             v = float(amount)
@@ -249,7 +249,7 @@ class CareerVietParser(IParser):
 
     def _salary_from_text(
         self, text: str
-    ) -> tuple[Optional[int], Optional[int], Optional[str]]:
+    ) -> tuple[int | None, int | None, str | None]:
         """Parse the displayed salary string, e.g. 'Lương: 18 - 25 Triệu VND'.
 
         Returns (min, max, currency); (None, None, None) for "Cạnh tranh" /
@@ -277,7 +277,7 @@ class CareerVietParser(IParser):
             return n, n, currency
         return None, None, None
 
-    def _int32(self, value) -> Optional[int]:
+    def _int32(self, value) -> int | None:
         """Coerce to a positive int that fits the schema's Int32, else None."""
         try:
             n = int(float(value))
@@ -286,13 +286,13 @@ class CareerVietParser(IParser):
         return n if 0 < n <= _INT32_MAX else None
 
     # ── HTML sections ──────────────────────────────────────────────────────
-    def _heading(self, soup: BeautifulSoup, text: str) -> Optional[Tag]:
+    def _heading(self, soup: BeautifulSoup, text: str) -> Tag | None:
         needle = text.casefold()
         return soup.find(
             lambda t: t.name in ("h2", "h3") and t.get_text(strip=True).casefold() == needle
         )
 
-    def _section_block(self, soup: BeautifulSoup, heading: str) -> Optional[Tag]:
+    def _section_block(self, soup: BeautifulSoup, heading: str) -> Tag | None:
         """The `div.detail-row` wrapping a section heading and its body."""
         h = self._heading(soup, heading)
         if h is None:
@@ -325,14 +325,14 @@ class CareerVietParser(IParser):
             if ln.strip() and ln.strip() != heading_text
         ]
 
-    def _section_text(self, soup: BeautifulSoup, heading: str) -> Optional[str]:
+    def _section_text(self, soup: BeautifulSoup, heading: str) -> str | None:
         lines = self._section_lines(soup, heading)
         return "\n".join(lines) or None
 
     def _section_items(self, soup: BeautifulSoup, heading: str) -> list[str]:
         return self._section_lines(soup, heading)
 
-    def _detail_item(self, soup: BeautifulSoup, label: str) -> Optional[str]:
+    def _detail_item(self, soup: BeautifulSoup, label: str) -> str | None:
         """Value of a `<li><strong>LABEL</strong><p>VALUE</p></li>` detail row.
 
         The detail box is rendered twice (desktop + mobile) and the rows are not
@@ -351,10 +351,10 @@ class CareerVietParser(IParser):
         return None
 
     # ── fields built from either source ────────────────────────────────────
-    def _company_name(self, soup: BeautifulSoup) -> Optional[str]:
+    def _company_name(self, soup: BeautifulSoup) -> str | None:
         return self._text(soup.select_one("a.job-company-name"))
 
-    def _company_url(self, soup: BeautifulSoup) -> Optional[str]:
+    def _company_url(self, soup: BeautifulSoup) -> str | None:
         a = soup.select_one("a.job-company-name[href]")
         if a is None:
             return None
@@ -373,7 +373,7 @@ class CareerVietParser(IParser):
             or ""
         )
 
-    def _work_arrangement(self, title: str, description: Optional[str]) -> str:
+    def _work_arrangement(self, title: str, description: str | None) -> str:
         text = f"{title}\n{description or ''}"
         for pattern, value in _WORK_ARRANGEMENT:
             if pattern.search(text):
@@ -405,5 +405,5 @@ class CareerVietParser(IParser):
             return []
         return [p.strip() for p in value.split(",") if p.strip()]
 
-    def _text(self, el: Optional[Tag]) -> Optional[str]:
+    def _text(self, el: Tag | None) -> str | None:
         return _WS.sub(" ", el.get_text(" ", strip=True)) if el else None

@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Iterable
+from collections.abc import Iterable
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup

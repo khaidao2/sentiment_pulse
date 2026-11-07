@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from urllib.parse import urlparse
 
 from curl_cffi import requests as cffi

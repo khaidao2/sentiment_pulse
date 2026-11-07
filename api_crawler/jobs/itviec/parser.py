@@ -15,8 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
 
 from bs4 import BeautifulSoup, Tag
 
@@ -78,7 +78,7 @@ class ItviecParser(IParser):
             "benefits": self._section_items(soup, "Why you'll love working here"),
             "job_url": job_url,
             "job_id": job_id,
-            "crawled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "crawled_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "itviec",
         }
         yield record
@@ -94,25 +94,25 @@ class ItviecParser(IParser):
                 return data
         return {}
 
-    def _org_name(self, ld: dict) -> Optional[str]:
+    def _org_name(self, ld: dict) -> str | None:
         org = ld.get("hiringOrganization")
         return org.get("name") if isinstance(org, dict) else None
 
-    def _country(self, ld: dict) -> Optional[str]:
+    def _country(self, ld: dict) -> str | None:
         loc = ld.get("jobLocation")
         if isinstance(loc, list) and loc:
             addr = loc[0].get("address", {})
             return addr.get("addressCountry")
         return None
 
-    def _posted_days_ago(self, ld: dict) -> Optional[int]:
+    def _posted_days_ago(self, ld: dict) -> int | None:
         ds = ld.get("datePosted")
         try:
             return (date.today() - date.fromisoformat(ds)).days if ds else None
         except (ValueError, TypeError):
             return None
 
-    def _job_url(self, soup: BeautifulSoup, ld: dict) -> Optional[str]:
+    def _job_url(self, soup: BeautifulSoup, ld: dict) -> str | None:
         """Canonical URL of this posting — the natural key.
 
         Prefer <link rel="canonical">, then the og:url meta tag, then the
@@ -129,29 +129,29 @@ class ItviecParser(IParser):
             url = u if isinstance(u, str) else None
         return url.strip() if url else None
 
-    def _min_years_experience(self, ld: dict) -> Optional[int]:
+    def _min_years_experience(self, ld: dict) -> int | None:
         exp = ld.get("experienceRequirements")
         if isinstance(exp, dict) and isinstance(exp.get("monthsOfExperience"), int):
             return exp["monthsOfExperience"] // 12
         return None
 
     # ── helpers ────────────────────────────────────────────────────────────
-    def _text(self, el: Optional[Tag]) -> Optional[str]:
+    def _text(self, el: Tag | None) -> str | None:
         return _WS.sub(" ", el.get_text(" ", strip=True)) if el else None
 
-    def _attr(self, el: Optional[Tag], name: str) -> Optional[str]:
+    def _attr(self, el: Tag | None, name: str) -> str | None:
         return el.get(name) if el else None
 
-    def _heading(self, soup: BeautifulSoup, text: str) -> Optional[Tag]:
+    def _heading(self, soup: BeautifulSoup, text: str) -> Tag | None:
         return soup.find(
             lambda t: t.name in ("h2", "h3") and t.get_text(strip=True) == text
         )
 
-    def _section_body(self, soup: BeautifulSoup, heading: str) -> Optional[Tag]:
+    def _section_body(self, soup: BeautifulSoup, heading: str) -> Tag | None:
         h = self._heading(soup, heading)
         return h.find_next_sibling() if h else None
 
-    def _section_text(self, soup: BeautifulSoup, heading: str) -> Optional[str]:
+    def _section_text(self, soup: BeautifulSoup, heading: str) -> str | None:
         """Whole section, not just its first block.
 
         A section holds several sibling blocks — an intro <p>, a <ul>, another

@@ -18,8 +18,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from api_crawler.shared.ports.parser import IParser
 
@@ -37,7 +37,7 @@ _MS_KIND = {"module": "MODULE", "learningPath": "LEARNING_PATH"}
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _course_id(url: str) -> str:

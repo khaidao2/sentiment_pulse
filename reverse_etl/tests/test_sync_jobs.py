@@ -8,12 +8,10 @@ The cases that exercise main() drive it against a recording cursor and a stub
 ClickHouse client, so the SQL is asserted without a database.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
 import sync_jobs
-
 
 # A real posting shape: the parser dumped the requirements section into
 # `skills`, one bullet of which happens to mention a dictionary term.
@@ -66,7 +64,7 @@ class _Cursor:
 
     def fetchone(self):
         if "max(crawled_at)" in self._last:
-            return (datetime(2026, 10, 1, tzinfo=timezone.utc),)
+            return (datetime(2026, 10, 1, tzinfo=UTC),)
         self._next_id += 1
         return (self._next_id,)
 
@@ -83,13 +81,33 @@ class _Result:
         self.result_rows = [tuple(row.values())]
 
 
+class _Sightings:
+    """The bronze query's answer: (job_id, first crawl, last crawl) per job."""
+
+    def __init__(self, rows):
+        self.result_rows = rows
+
+
+FIRST = datetime(2026, 10, 2, tzinfo=UTC)
+LAST = datetime(2026, 11, 6, 3, 0)  # naive, as clickhouse_connect returns it
+
+# j-1 changed (it is in ROW); j-2 was re-crawled unchanged, so only bronze knows it.
+SIGHTINGS = [("j-1", FIRST, LAST), ("j-2", FIRST, LAST)]
+
+
 @pytest.fixture
 def run_sync(monkeypatch):
     """Run main() against the stubs and hand back the recorded statements."""
 
     cur = _Cursor()
     pg = type("PG", (), {"cursor": lambda self: cur, "commit": lambda self: None})()
-    ch = type("CH", (), {"query": lambda self, sql, parameters=None: _Result(ROW)})()
+
+    def query(self, sql, parameters=None):
+        if "bronze_all_sources" in sql:
+            return _Sightings(SIGHTINGS)
+        return _Result(ROW)
+
+    ch = type("CH", (), {"query": query})()
 
     monkeypatch.setattr(sync_jobs.psycopg, "connect", lambda dsn: pg)
     monkeypatch.setattr(sync_jobs.clickhouse_connect, "get_client", lambda **kw: ch)
@@ -106,7 +124,7 @@ def _job_insert(calls):
     """The INSERT INTO jobs, as a {column: value} dict."""
     sql, params = next(c for c in calls if c[0].startswith("INSERT INTO jobs ("))
     cols = sql.split("(", 1)[1].split(")", 1)[0].split(", ")
-    return dict(zip(cols, params))
+    return dict(zip(cols, params, strict=True))
 
 
 def _lookup_values(calls, table):
@@ -135,4 +153,78 @@ def test_requirement_prose_never_becomes_a_skill_lookup_row(run_sync):
 #     entry without a source cannot silently sync as NULL.
 def test_every_job_column_is_written(run_sync):
     job = _job_insert(run_sync)
-    assert set(job) == {"company_id", *sync_jobs.JOB_COLS}
+    assert set(job) == {"company_id", *sync_jobs.JOB_COLS, *sync_jobs.SIGHTING_COLS}
+
+
+def _job_upsert_sql(calls):
+    return next(c[0] for c in calls if c[0].startswith("INSERT INTO jobs ("))
+
+
+# 6 — OWNERSHIP: is_active/expires_at belong to the web app. The pipeline must
+#     name neither in any statement, or a re-crawl would undo an editor's hide.
+def test_pipeline_never_writes_the_app_owned_columns(run_sync):
+    for sql, _ in run_sync:
+        assert "is_active" not in sql and "expires_at" not in sql
+
+
+# 7 — FORWARD ONLY, in SQL: the guard is inside ON CONFLICT, so two overlapping
+#     runs converge regardless of order. Replaying old data cannot pull
+#     last_seen_at back or push first_seen_at forward.
+def test_sighting_columns_move_only_forward_in_the_upsert_itself(run_sync):
+    sql = _job_upsert_sql(run_sync)
+    on_conflict = sql.split("ON CONFLICT", 1)[1]
+    assert "last_seen_at = GREATEST(jobs.last_seen_at, EXCLUDED.last_seen_at)" in on_conflict
+    assert "first_seen_at = LEAST(jobs.first_seen_at, EXCLUDED.first_seen_at)" in on_conflict
+    # and never through the blanket EXCLUDED overwrite
+    assert "last_seen_at = EXCLUDED" not in on_conflict
+    assert "first_seen_at = EXCLUDED" not in on_conflict
+
+
+# 8 — the bronze sighting for the job (not silver's crawled_at) is what is
+#     written, normalised to aware UTC.
+def test_upsert_carries_the_bronze_sighting_as_utc(run_sync):
+    job = _job_insert(run_sync)
+    assert job["first_seen_at"] == FIRST
+    assert job["last_seen_at"] == LAST.replace(tzinfo=UTC)
+
+
+# 9 — a job re-crawled UNCHANGED never reaches the upsert, yet must still be
+#     marked seen, with the same guard and without touching updated_at.
+def test_unchanged_job_gets_a_guarded_sighting_update(run_sync):
+    updates = [c for c in run_sync if c[0].startswith("UPDATE jobs SET")]
+    assert [u[1][2] for u in updates] == ["j-2"]  # j-1 went through the upsert
+    sql = updates[0][0]
+    assert "GREATEST(last_seen_at, %s)" in sql and "LEAST(first_seen_at, %s)" in sql
+    assert "updated_at" not in sql
+
+
+# 10 — idempotent: a second identical run issues the identical statements and
+#      parameters, so replaying a window changes nothing the guard did not allow.
+def test_rerun_issues_identical_statements(monkeypatch, run_sync):
+    first = list(run_sync)
+    # run_sync built one cursor; call main again through the same stubs
+    cur = _Cursor()
+    pg = type("PG", (), {"cursor": lambda self: cur, "commit": lambda self: None})()
+    ch = type("CH", (), {"query": lambda self, sql, parameters=None: (
+        _Sightings(SIGHTINGS) if "bronze_all_sources" in sql else _Result(ROW))})()
+    monkeypatch.setattr(sync_jobs.psycopg, "connect", lambda dsn: pg)
+    monkeypatch.setattr(sync_jobs.clickhouse_connect, "get_client", lambda **kw: ch)
+    monkeypatch.setattr(sync_jobs, "_extraction_stats", [0, 0])
+    sync_jobs.main()
+    assert cur.calls == first
+
+
+# 11 — a job unchanged for days must still be recorded when silver has nothing
+#      newer: the "nothing newer" early return may not skip the sightings.
+def test_sightings_are_written_even_when_no_job_content_changed(monkeypatch):
+    cur = _Cursor()
+    pg = type("PG", (), {"cursor": lambda self: cur, "commit": lambda self: None})()
+    empty = type("E", (), {"column_names": [], "result_rows": []})()
+    ch = type("CH", (), {"query": lambda self, sql, parameters=None: (
+        _Sightings(SIGHTINGS[:1]) if "bronze_all_sources" in sql else empty)})()
+    monkeypatch.setattr(sync_jobs.psycopg, "connect", lambda dsn: pg)
+    monkeypatch.setattr(sync_jobs.clickhouse_connect, "get_client", lambda **kw: ch)
+    monkeypatch.setenv("POSTGRES_DSN", "postgresql:///stub")
+    monkeypatch.setenv("CLICKHOUSE_HOST", "stub")
+    sync_jobs.main()
+    assert [c[1][2] for c in cur.calls if c[0].startswith("UPDATE jobs SET")] == ["j-1"]
