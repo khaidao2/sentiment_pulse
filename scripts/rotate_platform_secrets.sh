@@ -278,7 +278,11 @@ fi
 
 # =========================================================== 2. grafana ====
 step "2/10  grafana Keycloak client (un-sharing the reused secret)"
-if grep -q 'GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET' "$HV/grafana-values.yaml"; then
+# Anchor on an indented ASSIGNMENT, not the bare name. The replacement this
+# phase writes leaves a top-level comment mentioning the variable, so a loose
+# grep matches its own output and the phase re-runs forever -- regenerating a
+# live client secret every time, which is the opposite of idempotent.
+if grep -qE '^[[:space:]]+GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:' "$HV/grafana-values.yaml"; then
   GF_OAUTH="$(rotate_client grafana)"
   record "grafana client secret" "$GF_OAUTH"
   ok "Keycloak grafana secret regenerated (airflow-client and grafana no longer share one)"
