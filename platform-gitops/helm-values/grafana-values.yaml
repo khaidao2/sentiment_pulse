@@ -1,4 +1,15 @@
-adminPassword: adminpassword
+# The admin password is NOT here -- it was, in plaintext, in a public repo.
+admin:
+  existingSecret: grafana-admin-sealed
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Supplies GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET and CH_DATASOURCE_PASSWORD.
+# Grafana expands $VAR in provisioning files, which is how the datasource below
+# gets its password without the value appearing in this file.
+envFromSecrets:
+  - name: grafana-oauth-sealed
+  - name: grafana-clickhouse-ds-sealed
 
 persistence:
   enabled: true
@@ -21,7 +32,6 @@ env:
   GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
   GF_AUTH_GENERIC_OAUTH_NAME: "Keycloak"
   GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "grafana"
-  GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: "XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I"
   GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
   GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://auth.sentpul.click/realms/data-platform/protocol/openid-connect/auth"
   GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://auth.sentpul.click/realms/data-platform/protocol/openid-connect/token"
@@ -51,7 +61,7 @@ datasources:
         defaultDatabase: default
         tlsSkipVerify: false
       secureJsonData:
-        password: clickhousepassword
+        password: $CH_DATASOURCE_PASSWORD
 
 dashboardProviders:
   dashboardproviders.yaml:

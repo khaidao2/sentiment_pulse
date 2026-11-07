@@ -1,12 +1,12 @@
 # oauth2-proxy for CloudBeaver — gates cloudbeaver.sentpul.click behind Keycloak.
 # Traffic path: cloudflared -> this oauth2-proxy -> cloudbeaver service.
 config:
-  clientID: "cloudbeaver"
+  # Credentials live in a SealedSecret; see
+  # manifests/oauth2-proxy-cloudbeaver-sealed-secret.yaml.
+  existingSecret: oauth2-proxy-cloudbeaver-sealed
   # Must match the secret of the `cloudbeaver` Keycloak client
   # (scripts/cloudbeaver_keycloak.sh). Move to Vault for production.
-  clientSecret: "ec7b3de27e9af4bc08d35dad623abc9acd9081e2a310af45"
   # openssl rand -base64 32 | tr -- '+/' '-_'
-  cookieSecret: "NAAgWCZSyyJLuMMQQOeQ1dDDHCQap28F9KSXqzLxhgY="
   configFile: |-
     provider = "oidc"
     oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"
@@ -20,7 +20,6 @@ config:
     cookie_secure = false # Local dev: TLS terminated at Cloudflare
     # Keycloak users are created by admin without SMTP email verification,
     # so id_token has email_verified=false. Accept it (internal IdP).
-    insecure_oidc_allow_unverified_email = true
 
 resources:
   requests:
