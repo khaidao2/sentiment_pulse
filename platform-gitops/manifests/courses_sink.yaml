@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: courses-sink
-          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-f0fef54
+          image: ghcr.io/khaidao2/sentiment-pulse-crawler:sha-6c781a0
           imagePullPolicy: Always
           command: ["python", "-m", "api_crawler.sink"]
           env:
