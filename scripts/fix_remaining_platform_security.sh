@@ -210,7 +210,16 @@ ok "on branch $BRANCH"
 step "1/5  ClickHouse password"
 if [ "$DO_CH" != 1 ]; then skip "skipped"
 elif ! grep -qE '^\s+value: "clickhousepassword"' "$MF/clickhouse.yaml" \
-  && grep -q 'secretKeyRef' "$MF/clickhouse.yaml"; then skip "already sealed"
+  && grep -q 'secretKeyRef' "$MF/clickhouse.yaml"; then
+  # The SERVER is sealed. That says nothing about its CONSUMERS: the first run
+  # of this script rotated the server and left airflow/clickhouse-credentials
+  # and airflow/grafana-clickhouse-ds-sealed on the old password, which broke
+  # every DAG task and every Grafana ClickHouse panel while ArgoCD still
+  # reported Synced. So reconcile them against the live server secret instead
+  # of skipping; the helper is idempotent and verifies by authenticating.
+  skip "server already sealed -- reconciling the consumers"
+  bash scripts/reseal_clickhouse_consumers.sh || die "consumer reconcile failed"
+  CH_PENDING=0
 else
   CH_NEW="$(strong)"
   CH_USER="$(sed -nE 's/^\s+- name: CLICKHOUSE_USER\s*$//;t a;b;:a n;s/.*value: *"?([^"]*)"?.*/\1/p' "$MF/clickhouse.yaml" | head -1)"
@@ -264,7 +273,13 @@ fi
 # ==================================================== 2. keycloak db ========
 step "2/5  Keycloak Postgres passwords"
 if [ "$DO_KCDB" != 1 ]; then skip "skipped (--skip-keycloak-db)"
-elif grep -q 'existingSecret' "$HV/keycloak-values.yaml"; then skip "already sealed"
+# Anchored on the plaintext itself, not on the string "existingSecret". That
+# string also appears at the top of keycloak-values.yaml for the Keycloak ADMIN
+# password (sealed in an earlier pass), so the old check reported "already
+# sealed" while postgresql.auth.password and .postgresPassword were still
+# literals in a public repo -- and still the live values of
+# keycloak/keycloak-postgresql.
+elif ! grep -qE '^\s+postgresPassword:' "$HV/keycloak-values.yaml"; then skip "already sealed"
 else
   PG_OLD_USER="$(k -n keycloak get secret keycloak-postgresql -o jsonpath='{.data.password}' | base64 -d)"
   PG_OLD_ADMIN="$(k -n keycloak get secret keycloak-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d)"
