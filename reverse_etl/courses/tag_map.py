@@ -170,6 +170,7 @@ def report(tag_counts: dict[str, int]) -> str:
 def main() -> None:
     """Coverage report against the live catalogue."""
     import os
+
     import clickhouse_connect
 
     client = clickhouse_connect.get_client(
@@ -181,7 +182,7 @@ def main() -> None:
     rows = client.query(
         "SELECT arrayJoin(tags) AS t, count() FROM silver_courses GROUP BY t"
     ).result_rows
-    print(report({t: n for t, n in rows}))
+    print(report(dict(rows)))
 
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ import logging
 import time
 import urllib.error
 import urllib.request
-from typing import Iterable
+from collections.abc import Iterable
 
 from api_crawler.shared.ports.source import ISource
 

@@ -95,7 +95,7 @@ def client():
 
 def fetch(ch) -> list[dict]:
     res = ch.query(f"SELECT {', '.join(COLUMNS)} FROM silver_courses")
-    return [dict(zip(res.column_names, row)) for row in res.result_rows]
+    return [dict(zip(res.column_names, row, strict=True)) for row in res.result_rows]
 
 
 def match_row(row: dict) -> tuple[list[str], list[str]]:

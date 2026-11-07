@@ -29,9 +29,8 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "reverse_etl"))
 
-from skills import dictionary as d          # noqa: E402
+from skills import dictionary as d  # noqa: E402
 from skills.extractor import extract_skills, normalize  # noqa: E402
-
 
 # ── Vietnamese aliases must keep resolving ────────────────────────────────
 

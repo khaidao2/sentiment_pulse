@@ -21,10 +21,10 @@ test_sync_course_skills.py uses, so the SQL is asserted without a database.
 import sys
 
 import pytest
-
 import sync_job_roles
-from roles.classify import AMBIGUOUS, METHOD, QUALIFIER, ROLE, UNKNOWN
 from sync_job_roles import decode_rule, encode_rule, plan
+
+from roles.classify import AMBIGUOUS, METHOD, QUALIFIER, ROLE, UNKNOWN
 
 # Real titles from the 2026-11-02 corpus, one per outcome.
 JOBS = [
@@ -158,7 +158,7 @@ def test_the_title_is_stored_exactly_as_crawled(run):
     stored = {p[0]: p[5] for p in _inserts(cur.calls)}
     assert stored["j-viet"] == "CHUYÊN VIÊN PHÂN TÍCH DỮ LIỆU", \
         "the normalised matching key must never reach storage"
-    assert stored == {j: t for j, t in JOBS}
+    assert stored == dict(JOBS)
 
 
 # ── seniority stays independent ──────────────────────────────────────────────

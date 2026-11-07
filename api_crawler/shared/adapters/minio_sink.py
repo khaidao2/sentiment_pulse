@@ -20,7 +20,7 @@ import io
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -84,7 +84,7 @@ class MinioSink(ISink):
         pq.write_table(table, buf, compression="snappy")
         payload = buf.getvalue()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         key = f"{self._prefix}/dt={now:%Y-%m-%d}/part-{now:%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:8]}.parquet"
         self._client.put_object(
             self._bucket,

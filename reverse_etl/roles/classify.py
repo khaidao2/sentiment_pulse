@@ -285,6 +285,7 @@ def report(titles, min_postings: int = MIN_FAMILY_POSTINGS, skill_counts=None) -
 def main() -> None:
     """Coverage against the live job corpus."""
     import os
+
     import psycopg
 
     with psycopg.connect(os.environ["POSTGRES_DSN"]) as pg, pg.cursor() as cur:

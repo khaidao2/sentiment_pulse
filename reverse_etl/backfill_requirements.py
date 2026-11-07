@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import clickhouse_connect
 import psycopg
@@ -36,7 +36,7 @@ def _fetch(ch):
     names = res.column_names
     out = {}
     for row in res.result_rows:
-        rec = dict(zip(names, row))
+        rec = dict(zip(names, row, strict=True))
         out[rec["job_id"]] = {pg: list(rec.get(ch_col) or []) for pg, ch_col in FIELDS.items()}
     return out
 
@@ -77,7 +77,7 @@ def main() -> None:
         print(f"  {col:<17} non-empty {nonempty:>5}   empty in source {empty:>5}")
     for j in present:
         s = current[j]["source"] or "?"
-        d = per_source.setdefault(s, {c: 0 for c in FIELDS})
+        d = per_source.setdefault(s, dict.fromkeys(FIELDS, 0))
         for col in FIELDS:
             if source[j][col]:
                 d[col] += 1
@@ -119,7 +119,7 @@ def main() -> None:
         print("\nDRY RUN — nothing written.")
         return
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     tbl = f"{SNAPSHOT_PREFIX}{stamp}"
     with pg.cursor() as cur:
         cur.execute(

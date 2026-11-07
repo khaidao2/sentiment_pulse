@@ -119,9 +119,8 @@ def test_the_generated_file_is_what_the_generator_produces(topics_doc):
     """
     import sys
     sys.path.insert(0, str(_ROOT / "data-contracts" / "src"))
+
     from sentpul import config
-    from sentpul.cli import _render_topics
-    import click.testing
 
     seen = {}
     for c in iter_contracts(_CONTRACTS):

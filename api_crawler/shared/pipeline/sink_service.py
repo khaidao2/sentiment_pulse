@@ -41,9 +41,8 @@ class SinkService:
                 record = self._subscriber.poll(self._poll_timeout)
                 if record is not None:
                     self._sink.add(record)
-                if self._sink.should_flush():
-                    if self._sink.flush():
-                        self._subscriber.commit()
+                if self._sink.should_flush() and self._sink.flush():
+                    self._subscriber.commit()
         finally:
             if self._sink.close():
                 self._subscriber.commit()

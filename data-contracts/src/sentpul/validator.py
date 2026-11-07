@@ -1,14 +1,16 @@
-import fastavro
 import json
+
+import fastavro
+
 
 def load_avro_schema(path: str) -> dict:
     """Load Avro schema from a file."""
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             schema = json.load(f)
         return fastavro.parse_schema(schema)
     except Exception as e:
-        raise ValueError(f"Failed to load Avro schema from {path}: {e}")
+        raise ValueError(f"Failed to load Avro schema from {path}: {e}") from e
 
 def validate_record(data, schema):
     """Validate a record against an Avro schema."""
@@ -16,4 +18,4 @@ def validate_record(data, schema):
         fastavro.validate(data, schema)
         return True
     except Exception as e:
-        raise ValueError(f"Record validation failed: {e}")
+        raise ValueError(f"Record validation failed: {e}") from e

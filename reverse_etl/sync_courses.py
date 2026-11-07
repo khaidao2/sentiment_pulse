@@ -60,7 +60,7 @@ Env:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import clickhouse_connect
 import psycopg
@@ -180,8 +180,8 @@ def main() -> None:
     # the wrap would be the first thing it did. max(..., _EPOCH) is what makes
     # the cold start work, and the empty-target case is the one to re-check if
     # this predicate is ever moved into ClickHouse.
-    _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-    wm = watermark if watermark.tzinfo else watermark.replace(tzinfo=timezone.utc)
+    _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+    wm = watermark if watermark.tzinfo else watermark.replace(tzinfo=UTC)
     lower_bound = max(wm - timedelta(days=1), _EPOCH)
 
     # 2. pull only the changed slice from ClickHouse. crawled_at is a String in
@@ -197,7 +197,7 @@ def main() -> None:
         "WHERE parseDateTimeBestEffort(crawled_at) > parseDateTimeBestEffort(%(wm)s)",
         parameters={"wm": lower_bound.isoformat()},
     )
-    rows = [dict(zip(result.column_names, r)) for r in result.result_rows]
+    rows = [dict(zip(result.column_names, r, strict=True)) for r in result.result_rows]
 
     if not rows:
         # Expected today: silver_courses holds 0 rows because crawl_courses has

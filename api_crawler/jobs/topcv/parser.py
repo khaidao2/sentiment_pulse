@@ -24,8 +24,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date, datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
 
 from bs4 import BeautifulSoup, Tag
 
@@ -126,7 +126,7 @@ class TopcvParser(IParser):
             "benefits": self._benefits(ld, sections),
             "job_url": job_url,
             "job_id": job_id,
-            "crawled_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "crawled_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "topcv",
         }
         yield record
@@ -142,11 +142,11 @@ class TopcvParser(IParser):
                 return data
         return {}
 
-    def _org_name(self, ld: dict) -> Optional[str]:
+    def _org_name(self, ld: dict) -> str | None:
         org = ld.get("hiringOrganization")
         return self._str(org.get("name")) if isinstance(org, dict) else None
 
-    def _org_url(self, ld: dict) -> Optional[str]:
+    def _org_url(self, ld: dict) -> str | None:
         org = ld.get("hiringOrganization")
         return self._str(org.get("sameAs")) if isinstance(org, dict) else None
 
@@ -160,7 +160,7 @@ class TopcvParser(IParser):
         addr = loc.get("address")
         return addr if isinstance(addr, dict) else {}
 
-    def _country(self, ld: dict) -> Optional[str]:
+    def _country(self, ld: dict) -> str | None:
         return self._str(self._address(ld).get("addressCountry"))
 
     def _location(self, ld: dict, soup: BeautifulSoup) -> str:
@@ -175,20 +175,20 @@ class TopcvParser(IParser):
         )
         return value or self._text(soup.select_one(".address .city-text")) or ""
 
-    def _posted_days_ago(self, ld: dict) -> Optional[int]:
+    def _posted_days_ago(self, ld: dict) -> int | None:
         ds = ld.get("datePosted")
         try:
             return (date.today() - date.fromisoformat(ds)).days if ds else None
         except (ValueError, TypeError):
             return None
 
-    def _min_years_experience(self, ld: dict) -> Optional[int]:
+    def _min_years_experience(self, ld: dict) -> int | None:
         exp = ld.get("experienceRequirements")
         if isinstance(exp, dict) and isinstance(exp.get("monthsOfExperience"), int):
             return exp["monthsOfExperience"] // 12
         return None
 
-    def _job_url(self, soup: BeautifulSoup, ld: dict) -> Optional[str]:
+    def _job_url(self, soup: BeautifulSoup, ld: dict) -> str | None:
         """Canonical URL of this posting — the natural key.
 
         Prefer <link rel="canonical">, then og:url, then the JSON-LD url. The
@@ -248,7 +248,7 @@ class TopcvParser(IParser):
             "currency": "USD",
         }
 
-    def _usd(self, amount, rate: float) -> Optional[int]:
+    def _usd(self, amount, rate: float) -> int | None:
         try:
             v = float(amount)
         except (TypeError, ValueError):
@@ -302,7 +302,7 @@ class TopcvParser(IParser):
         low = lines[0].lower()
         return any(m in low for m in _NICE_TO_HAVE_MARKERS)
 
-    def _canon_heading(self, text: str) -> Optional[str]:
+    def _canon_heading(self, text: str) -> str | None:
         t = _WS.sub(" ", text).strip().lower()
         for known in (_SEC_DESCRIPTION, _SEC_REQUIREMENTS, _SEC_BENEFITS):
             if t.startswith(known):
@@ -329,7 +329,7 @@ class TopcvParser(IParser):
         return sections.get(_SEC_BENEFITS, {}).get("items", [])
 
     # ── CSS fallbacks ──────────────────────────────────────────────────────
-    def _company_size(self, soup: BeautifulSoup) -> Optional[str]:
+    def _company_size(self, soup: BeautifulSoup) -> str | None:
         for label in soup.select(".box-company-info-detail__list--item-label"):
             text = (self._text(label) or "").lower().rstrip(":")
             if any(text.startswith(w) for w in _SIZE_LABELS):
@@ -350,7 +350,7 @@ class TopcvParser(IParser):
         return "AT_OFFICE"
 
     # ── helpers ────────────────────────────────────────────────────────────
-    def _text(self, el: Optional[Tag]) -> Optional[str]:
+    def _text(self, el: Tag | None) -> str | None:
         return _WS.sub(" ", el.get_text(" ", strip=True)).strip() if el else None
 
     def _lines(self, el: Tag) -> list[str]:
@@ -370,5 +370,5 @@ class TopcvParser(IParser):
         items = [_WS.sub(" ", p).strip() for p in text.split(",")]
         return list(dict.fromkeys(i for i in items if i))
 
-    def _str(self, value) -> Optional[str]:
+    def _str(self, value) -> str | None:
         return value.strip() if isinstance(value, str) and value.strip() else None

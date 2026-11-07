@@ -22,7 +22,7 @@ from __future__ import annotations
 import argparse
 import collections
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import clickhouse_connect
 import psycopg
@@ -114,7 +114,7 @@ def main() -> None:
         print("\nDRY RUN — nothing written.")
         return
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     with pg.cursor() as cur:
         s_tbl, j_tbl = _snapshot(cur, stamp)
         print(f"snapshot: {s_tbl}, {j_tbl}")
