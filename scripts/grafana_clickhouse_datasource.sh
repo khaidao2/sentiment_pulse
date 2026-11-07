@@ -29,7 +29,7 @@ die()  { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 # ── config ────────────────────────────────────────────────────────────────────
 GF_URL="${GF_URL:-https://grafana.sentpul.click}"
 GF_ADMIN_USER="${GF_ADMIN_USER:-admin}"
-GF_ADMIN_PASSWORD="${GF_ADMIN_PASSWORD:-adminpassword}"
+GF_ADMIN_PASSWORD="${GF_ADMIN_PASSWORD:?set GF_ADMIN_PASSWORD}"
 GF_PORT_FORWARD="${GF_PORT_FORWARD:-0}"
 GF_NAMESPACE="${GF_NAMESPACE:-airflow}"
 GF_PF_PORT="${GF_PF_PORT:-3000}"
@@ -37,7 +37,7 @@ GF_PF_PORT="${GF_PF_PORT:-3000}"
 CH_HOST="${CH_HOST:-clickhouse.database.svc.cluster.local}"
 CH_PORT="${CH_PORT:-8123}"
 CH_USER="${CH_USER:-clickhouse}"
-CH_PASSWORD="${CH_PASSWORD:-clickhousepassword}"
+CH_PASSWORD="${CH_PASSWORD:?set CH_PASSWORD}"
 CH_DATABASE="${CH_DATABASE:-default}"
 
 DS_NAME="ClickHouse"

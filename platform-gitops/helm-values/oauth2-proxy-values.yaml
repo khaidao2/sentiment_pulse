@@ -1,9 +1,9 @@
 # oauth2-proxy values.yaml
 config:
-  clientID: "airflow-client"
-  clientSecret: "XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I" # Thay thế bằng secret sinh từ Keycloak
-  # openssl rand -base64 32 | tr -- '+/' '-_'
-  cookieSecret: "ZDFhMkIzYzRkNURlRmdoSWpLbU5vUHFSc1R1VndYeVo=" 
+  # Credentials live in a SealedSecret, not here. This file was public
+  # with real values in it; see manifests/oauth2-proxy-airflow-sealed-secret.yaml.
+  # Chart 7.7.2 reads client-id / client-secret / cookie-secret from it.
+  existingSecret: oauth2-proxy-airflow-sealed
   configFile: |-
     provider = "oidc"
     oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"

@@ -49,11 +49,12 @@ spec:
               name: api
             - containerPort: 9001
               name: console
-          env:
-            - name: MINIO_ROOT_USER
-              value: "minioadmin"
-            - name: MINIO_ROOT_PASSWORD
-              value: "minioadminpassword"
+          # Root credentials come from a SealedSecret. They were literals here, in a
+          # public repo. The sinks and transform DAGs read the separate
+          # `minio-credentials` secret, which must be rotated in step with this one.
+          envFrom:
+            - secretRef:
+                name: minio-root-sealed
             # Public URL, not the in-cluster Service. MinIO BLOCKS startup until
             # OpenID initialises, so an unreachable issuer means it never opens
             # :9000/:9001 at all -> 502 at the tunnel. Cross-node pod traffic was
@@ -64,8 +65,6 @@ spec:
               value: "https://auth.sentpul.click/realms/data-platform/.well-known/openid-configuration"
             - name: MINIO_IDENTITY_OPENID_CLIENT_ID
               value: "minio"
-            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
-              value: "minio-keycloak-client-secret-key-1234"
             - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
               value: "https://minio.sentpul.click/oauth_callback"
             - name: MINIO_IDENTITY_OPENID_SCOPES
