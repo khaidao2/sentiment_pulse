@@ -33,9 +33,22 @@
 #
 #  4. The two open PRs.
 #
-# ORDERING RULE, same as the other scripts here: create and APPLY every secret
-# and ConfigMap BEFORE committing the manifest that references it, so a merge
-# can never leave a pod waiting on something that does not exist.
+# ORDERING RULE, learned the hard way. Both `clickhouse` and
+# `clickhouse-credentials` are ArgoCD Applications with selfHeal=true, and
+# Keycloak's database secret is rendered by its chart from the values file. So
+# a secret applied with kubectl is REVERTED to git within minutes, and the
+# ClickHouse server's password comes from a literal in the Deployment that only
+# changes when the manifest merges.
+#
+# The first run of this script sealed, applied, restarted and then verified --
+# and failed, because the restart picked up git's unchanged literal while
+# ArgoCD quietly reverted the consumer secret. Nothing broke (both sides stayed
+# on the old password, consistently), but nothing rotated either.
+#
+# So the order here is: PREPARE everything (seal, edit, and for a db-backed
+# credential change the database), then COMMIT AND MERGE, then let ArgoCD apply
+# and only THEN restart and verify. Verification before the merge is meaningless
+# in a GitOps repo that self-heals.
 #
 # Usage:
 #   bash scripts/fix_remaining_platform_security.sh                 # everything, prompts once
@@ -121,6 +134,18 @@ ok "credential vault present ($(stat -c %a "$CREDS"))"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die "working tree dirty; commit or stash first"
 git fetch -q origin main; ok "clean tree, origin/main fetched"
 START_SHA="$(git rev-parse HEAD)"
+
+# Nothing in this repo takes effect before a merge (ArgoCD selfHeal). For the
+# ClickHouse change that just means "no rotation". For the Keycloak database it
+# is unsafe: ALTER USER has already run, so leaving the manifest unmerged means
+# the next restart hands Keycloak a secret that disagrees with its database.
+if [ "$DO_MERGE" != 1 ] && [ "$DO_KCDB" = 1 ]; then
+  die "--no-merge cannot be combined with the Keycloak database rotation: the
+  database would be changed while the manifest that tells Keycloak about it
+  stays unmerged, and the next restart would lock the IdP out of its storage.
+  Use --skip-keycloak-db with --no-merge, or allow the merge."
+fi
+[ "$DO_MERGE" = 1 ] || warn "--no-merge: changes are prepared and committed but NOT applied; nothing rotates until you merge"
 
 CH_POD=""; KC_POD=keycloak-0
 if [ "$DO_CH" = 1 ]; then
@@ -231,24 +256,9 @@ yaml.safe_load_all(s2)  # cheap guard: the edit must not break the document
 p.write_text(s2); print('  dbt/profiles.yml -> env_var lookup')
 PY
 
-  k -n database rollout restart deploy/clickhouse >/dev/null
-  k -n database rollout status deploy/clickhouse --timeout=240s >/dev/null \
-    || die "clickhouse did not come back; the sealed secret holds the new password"
-  CH_POD="$(k -n database get pods --no-headers | awk '/^clickhouse-/ && /Running/{print $1; exit}')"
-  for _ in $(seq 1 20); do
-    if k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER" \
-         --password "$CH_NEW" --query "SELECT 1" >/dev/null 2>&1; then break; fi
-    sleep 3
-  done
-  k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER" \
-      --password "$CH_NEW" --query "SELECT 1" >/dev/null 2>&1 \
-    || die "the new ClickHouse password does not authenticate after restart"
-  ok "new password authenticates against ClickHouse"
-  if k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER" \
-       --password "clickhousepassword" --query "SELECT 1" >/dev/null 2>&1; then
-    die "the LEAKED ClickHouse password still works -- rotation did not take"
-  fi
-  ok "leaked password rejected"
+  CH_PENDING=1; CH_USER_OUT="$CH_USER"; CH_NEW_OUT="$CH_NEW"
+  ok "prepared -- NOT restarted yet: the server's password is a literal in the"
+  ok "  Deployment, so it only changes when this manifest merges (phase 5)."
 fi
 
 # ==================================================== 2. keycloak db ========
@@ -316,19 +326,19 @@ assert 'postgresPassword:' not in s, 'a plaintext postgres password survived'
 p.write_text(s); print('  keycloak-values.yaml -> existingSecret')
 PY
 
-  k -n keycloak rollout restart statefulset/keycloak >/dev/null
-  k -n keycloak rollout status statefulset/keycloak --timeout=420s >/dev/null \
-    || die "Keycloak did not come back healthy"
-  for _ in $(seq 1 30); do
-    [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://auth.sentpul.click/realms/master)" = 200 ] && break
-    sleep 10
-  done
-  [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://auth.sentpul.click/realms/master)" = 200 ] \
-    || die "Keycloak is up but not serving its realm"
+  # No restart here either. The StatefulSet still references the chart-rendered
+  # secret, whose value ArgoCD restores from the values file until the merge --
+  # restarting now would hand Keycloak the OLD password against a database that
+  # already has the new one, i.e. lock the IdP out of its own storage.
+  # Postgres does not drop live sessions on ALTER USER, so the running Keycloak
+  # keeps working untouched until the merge rolls it.
   trap - ERR
+  KCDB_PENDING=1
+  KCDB_OLD_USER="$PG_OLD_USER"; KCDB_OLD_ADMIN="$PG_OLD_ADMIN"
+  KCDB_NEW_ADMIN="$PG_NEW_ADMIN"; KCDB_USER="$DBUSER"
   record "keycloak db password ($DBUSER)" "$PG_NEW_USER"
   record "keycloak db superuser (postgres)" "$PG_NEW_ADMIN"
-  ok "Keycloak healthy against the rotated database passwords"
+  ok "database rotated and sealed; rollout deferred to phase 5"
 fi
 
 # =================================================== 3. oauth2-proxy =======
@@ -435,13 +445,94 @@ MSG
 fi
 
 # ======================================================= 5. verify =========
-step "5/5  Verify"
+step "5/5  Let ArgoCD apply, then restart and verify"
+CH_PENDING="${CH_PENDING:-0}"; KCDB_PENDING="${KCDB_PENDING:-0}"
+if [ "$DO_MERGE" != 1 ]; then
+  warn "merge skipped, so nothing has been applied. Still pending:"
+  [ "$CH_PENDING" = 1 ]   && warn "  clickhouse: server still on the old password (consumers agree -- consistent)"
+  [ "$KCDB_PENDING" = 1 ] && warn "  keycloak db: ROTATED IN THE DATABASE but unmerged -- merge before any restart"
+  warn "Merge the PR, then re-run with --skip-clickhouse --skip-keycloak-db --skip-proxy to verify."
+  exit 0
+fi
+
+# settle <app> <ns> <kind/name> <jsonpath> <expected>
+# Nudge ArgoCD, wait for the live object to match, and fall back to a direct
+# apply if the sync stalls -- which it does when a previous bad revision left
+# the operation retrying with backoff.
+settle(){
+  local app="$1" ns="$2" obj="$3" jp="$4" want="$5" f="${6:-}"
+  k -n argocd annotate app "$app" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+  local i got
+  for i in $(seq 1 30); do
+    got="$(k -n "$ns" get $obj -o jsonpath="$jp" 2>/dev/null || true)"
+    [ "$got" = "$want" ] && { ok "$app applied ($obj)"; return 0; }
+    sleep 10
+  done
+  if [ -n "$f" ] && [ -f "$f" ]; then
+    warn "$app did not converge in 5 min; applying $f directly"
+    k apply -f "$f" >/dev/null || die "direct apply of $f failed"
+    for i in $(seq 1 18); do
+      got="$(k -n "$ns" get $obj -o jsonpath="$jp" 2>/dev/null || true)"
+      [ "$got" = "$want" ] && { ok "$app applied directly ($obj)"; return 0; }
+      sleep 10
+    done
+  fi
+  return 1
+}
+
+if [ "$CH_PENDING" = 1 ]; then
+  settle clickhouse database deploy/clickhouse \
+    '{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_PASSWORD")].valueFrom.secretKeyRef.name}' \
+    clickhouse-server-sealed "$MF/clickhouse.yaml" \
+    || die "clickhouse Deployment never picked up the sealed secret. Server and consumers are still on the OLD password, which is consistent -- nothing is broken. Investigate the ArgoCD app before retrying."
+  k -n database rollout status deploy/clickhouse --timeout=240s >/dev/null || warn "rollout not confirmed"
+  CH_POD="$(k -n database get pods --no-headers | awk '/^clickhouse-/ && /Running/{print $1; exit}')"
+  for _ in $(seq 1 20); do
+    k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER_OUT" \
+      --password "$CH_NEW_OUT" --query "SELECT 1" >/dev/null 2>&1 && break
+    sleep 5
+  done
+  k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER_OUT" \
+      --password "$CH_NEW_OUT" --query "SELECT 1" >/dev/null 2>&1 \
+    || die "the new ClickHouse password still does not authenticate after the merge"
+  ok "ClickHouse: new password authenticates"
+  k -n database exec "$CH_POD" -- clickhouse-client --user "$CH_USER_OUT" \
+      --password clickhousepassword --query "SELECT 1" >/dev/null 2>&1 \
+    && die "the LEAKED ClickHouse password still works" || ok "ClickHouse: leaked password rejected"
+  CONS="$(k -n airflow get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)"
+  [ "$CONS" = "$CH_NEW_OUT" ] && ok "consumers hold the same password as the server" \
+    || die "airflow/clickhouse-credentials disagrees with the server -- Grafana, dbt and reverse_etl will fail"
+fi
+
+if [ "$KCDB_PENDING" = 1 ]; then
+  rollback_db2(){
+    warn "Keycloak did not come back -- rolling the database passwords back"
+    k -n keycloak exec -i keycloak-postgresql-0 -- env PGPASSWORD="$KCDB_NEW_ADMIN" \
+      psql -U postgres -tAc "ALTER USER $KCDB_USER WITH PASSWORD '$KCDB_OLD_USER';" >/dev/null 2>&1 || true
+    k -n keycloak exec -i keycloak-postgresql-0 -- env PGPASSWORD="$KCDB_NEW_ADMIN" \
+      psql -U postgres -tAc "ALTER USER postgres WITH PASSWORD '$KCDB_OLD_ADMIN';" >/dev/null 2>&1 || true
+    warn "database restored. REVERT THE MERGE TOO: git revert <the merge> && git push"
+  }
+  settle keycloak keycloak sts/keycloak \
+    '{.spec.template.spec.containers[0].env[?(@.name=="KEYCLOAK_DATABASE_PASSWORD")].valueFrom.secretKeyRef.name}' \
+    keycloak-postgresql-sealed "" \
+    || { rollback_db2; die "the Keycloak StatefulSet never pointed at the sealed secret"; }
+  k -n keycloak rollout status statefulset/keycloak --timeout=420s >/dev/null \
+    || { rollback_db2; die "Keycloak did not become ready"; }
+  up=0
+  for _ in $(seq 1 30); do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://auth.sentpul.click/realms/master)" = 200 ] && { up=1; break; }
+    sleep 10
+  done
+  [ "$up" = 1 ] || { rollback_db2; die "Keycloak is not serving its realm"; }
+  ok "Keycloak healthy against the rotated database passwords"
+fi
+
+step "Final health"
 for h in auth airflow grafana cloudbeaver minio argocd kafka; do
   c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$h.sentpul.click/" || echo 000)"
   case "$c" in 2*|3*|401|403) ok "$h.sentpul.click -> $c" ;; *) warn "$h.sentpul.click -> $c" ;; esac
 done
-# ':' before the literal: match it as a VALUE, so key names like
-# `adminPasswordKey: postgres-password` are not reported as leaks.
 LEAKS="$(grep -rniE ':[[:space:]]*"?(admin|clickhouse|minioadmin)password' "$HV" "$MF" dbt/ scripts/ 2>/dev/null \
   | grep -viE 'sealed|^[^:]*fix_remaining_platform_security\.sh:|^[^:]*rotate_' \
   | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)"
