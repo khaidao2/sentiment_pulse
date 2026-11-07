@@ -130,27 +130,8 @@ def test_every_dag_secret_is_sealed_into_the_airflow_namespace():
     )
 
 
-@pytest.mark.parametrize("name", sorted(_sealed_into_airflow()))
-def test_every_airflow_sealed_secret_has_an_application_serving_it(name):
-    """A manifest ArgoCD never syncs is a file, not a secret.
-
-    The manifests directory is served by per-file `directory.include`
-    Applications, so a new manifest with no Application is invisible to the
-    cluster -- which looks exactly like the missing-secret bug this file was
-    added to catch.
-
-    TWO THINGS THIS DELIBERATELY DOES NOT REQUIRE, both learned by getting
-    them wrong first:
-
-      * that the serving Application targets `airflow`. ArgoCD applies a
-        manifest into the namespace the MANIFEST declares; the Application's
-        destination is only the default for manifests that name none. So
-        webapp-postgres-sealed-dsn.yaml is legitimately served by the
-        webapp-scoped webapp-postgres Application while sealing into airflow.
-      * that the include is an exact filename. `include` takes a glob, and
-        'webapp-postgres*.yaml' is how that same Application picks up the
-        postgres manifest and its SealedSecrets together.
-    """
+def _application_includes() -> list[str]:
+    """Every `directory.include` glob across the ArgoCD Applications."""
     includes = []
     for path in sorted(APPS.glob("*.yaml")):
         try:
@@ -163,16 +144,51 @@ def test_every_airflow_sealed_secret_has_an_application_serving_it(name):
         include = (source.get("directory") or {}).get("include")
         if include:
             includes.append(include)
+    return includes
 
-    declaring = [
-        path.name for path in sorted(MANIFESTS.glob("*.yaml"))
-        if "kind: SealedSecret" in (text := path.read_text())
-        and f"name: {name}" in text
-        and "namespace: airflow" in text
-    ]
-    assert declaring, f"no manifest declares the airflow SealedSecret {name!r}"
-    assert any(fnmatch.fnmatch(d, pattern)
-               for d in declaring for pattern in includes), (
-        f"{name!r} is declared in {declaring} but no ArgoCD Application "
-        f"includes it; the include globs are {sorted(includes)}"
+
+def _sealed_secret_manifests() -> list[str]:
+    """Filenames under manifests/ that declare at least one SealedSecret."""
+    return [path.name for path in sorted(MANIFESTS.glob("*.yaml"))
+            if "kind: SealedSecret" in path.read_text()]
+
+
+@pytest.mark.parametrize("manifest", _sealed_secret_manifests())
+def test_every_sealed_secret_manifest_has_an_application_serving_it(manifest):
+    """A manifest ArgoCD never syncs is a file, not a secret.
+
+    The manifests directory is served by per-file `directory.include`
+    Applications, so a new manifest with no Application is invisible to the
+    cluster -- which looks exactly like the missing-secret bug this file was
+    added to catch. Worse than invisible, in fact: the secret still EXISTS,
+    because whoever added it ran `kubectl apply` once by hand and saw it work.
+    Nothing then keeps git and the cluster honest with each other.
+
+    THIS IS WHY THE CHECK IS NOT SCOPED TO ONE NAMESPACE. Its first version
+    only walked the secrets sealed into `airflow`, and reported four orphans.
+    There were seven: minio-root-sealed, oauth2-proxy-cloudbeaver-sealed and
+    clickhouse-server-sealed seal into `database` and so were invisible to the
+    test -- including the ClickHouse server's own password, added by the
+    rotation that was supposed to close this class of bug out. Parametrising
+    over the manifests rather than over one namespace's secret names is what
+    makes the guard total.
+
+    TWO THINGS THIS DELIBERATELY DOES NOT REQUIRE, both learned by getting
+    them wrong first:
+
+      * that the serving Application's destination matches the manifest's
+        namespace. ArgoCD applies a manifest into the namespace the MANIFEST
+        declares; the Application's destination is only the default for
+        manifests that name none. So webapp-postgres-sealed-dsn.yaml is
+        legitimately served by the webapp-scoped webapp-postgres Application
+        while sealing into airflow.
+      * that the include is an exact filename. `include` takes a glob, and
+        'webapp-postgres*.yaml' is how that same Application picks up the
+        postgres manifest and its SealedSecrets together.
+    """
+    includes = _application_includes()
+    assert any(fnmatch.fnmatch(manifest, pattern) for pattern in includes), (
+        f"{manifest!r} declares a SealedSecret but no ArgoCD Application "
+        f"includes it, so ArgoCD never syncs it; the include globs are "
+        f"{sorted(includes)}"
     )

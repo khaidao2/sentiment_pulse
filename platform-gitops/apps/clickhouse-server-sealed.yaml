@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clickhouse-server-credentials
+  namespace: argocd
+  annotations:
+    # Wave 1: before its consumer (wave 2). A pod whose referenced secret does
+    # not exist stays in CreateContainerConfigError rather than failing loudly.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    # Deleting this Application must take the SealedSecret with it rather than
+    # leave it behind unmanaged -- what happened to every secret in this group:
+    # applied once by hand, served by no Application, invisible to ArgoCD.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'clickhouse-server-sealed-secret.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    # the ClickHouse server runs in database.
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
