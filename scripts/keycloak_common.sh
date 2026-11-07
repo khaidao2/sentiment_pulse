@@ -6,8 +6,8 @@
 #
 # Credential resolution (first match wins):
 #   1. KEYCLOAK_ADMIN_USER / KEYCLOAK_ADMIN_PASSWORD env vars
-#   2. K8s secret  keycloak  (namespace: keycloak)  via kubectl
-#   3. Chart defaults (admin / adminpassword)
+#   2. K8s secret  keycloak-admin  (namespace: keycloak)  via kubectl
+#   3. nothing -- it fails. There is deliberately no built-in password.
 #
 # Connection: default https://auth.sentpul.click; set KC_PORT_FORWARD=1 to
 # port-forward svc/keycloak and talk to it locally (no DNS/TLS needed).
@@ -48,19 +48,30 @@ kc_start_port_forward() {
   ok "Using local Keycloak at $KC_URL"
 }
 
+# The secret the chart now reads too (auth.existingSecret in
+# helm-values/keycloak-values.yaml). It used to be the chart-generated secret
+# named after the release, `keycloak`.
+KC_ADMIN_SECRET="${KC_ADMIN_SECRET:-keycloak-admin}"
+
 kc_load_credentials() {
   if [[ -n "${KEYCLOAK_ADMIN_USER:-}" && -n "${KEYCLOAK_ADMIN_PASSWORD:-}" ]]; then
     info "Using admin credentials from environment variables."; return
   fi
-  if command -v kubectl &>/dev/null && kubectl get secret keycloak -n "$KC_NAMESPACE" &>/dev/null; then
-    KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
-    KEYCLOAK_ADMIN_PASSWORD="$(kubectl get secret keycloak -n "$KC_NAMESPACE" \
-      -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || true)"
-    [[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]] && { ok "Admin credentials loaded from secret 'keycloak'."; return; }
+  if command -v kubectl &>/dev/null; then
+    KEYCLOAK_ADMIN_PASSWORD="$(kubectl get secret "$KC_ADMIN_SECRET" -n "$KC_NAMESPACE" \
+      -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    if [[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]; then
+      KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
+      ok "Admin credentials loaded from secret '$KC_ADMIN_SECRET'."; return
+    fi
   fi
-  warn "Falling back to chart default credentials (admin/adminpassword)."
-  KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
-  KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-adminpassword}"
+  # NO BUILT-IN FALLBACK, deliberately. This function used to end with
+  # a `:-<default>` expansion, which both hard-coded a real
+  # credential into a public repo and let every caller keep working while the
+  # password was the well-known default -- so nothing ever surfaced the
+  # problem. Failing loudly is the point: a missing secret is a setup error,
+  # not something to paper over with a guess.
+  die "No admin credentials. Set KEYCLOAK_ADMIN_USER/KEYCLOAK_ADMIN_PASSWORD, or give this shell kubectl access to secret '$KC_ADMIN_SECRET' in namespace '$KC_NAMESPACE'."
 }
 
 kc_get_token() {
