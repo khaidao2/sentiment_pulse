@@ -18,8 +18,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from api_crawler.shared.ports.parser import IParser
 
@@ -34,6 +36,11 @@ _MS_LEVEL = {"beginner": "INTRO", "intermediate": "WORKING", "advanced": "DEEP"}
 # Flattening the two into one shape made a 102-minute learning path and the
 # 65-minute module inside it look like the same kind of thing.
 _MS_KIND = {"module": "MODULE", "learningPath": "LEARNING_PATH"}
+
+# `[title](url)`, lazy so a title holding its own brackets -- "[Python], UC
+# Berkeley" -- is not cut at the inner one: an inner `]` is not followed by
+# `(http`, so the match cannot end there.
+_MD_LINK = re.compile(r"\[(.+?)\]\((https?://[^)\s]+)\)")
 
 
 def _now() -> str:
@@ -68,20 +75,28 @@ def _record(**kw) -> dict:
 class CoursesParser(IParser):
 
     def parse(self, raw: str) -> Iterable[dict]:
+        """Dispatch on the envelope's source; the handler decodes its own page.
+
+        The page is handed over as the RAW string rather than pre-decoded JSON,
+        because csvideo's page is markdown. Decoding here would mean this method
+        knowing which dialects happen to be JSON, which is the one fact the
+        envelope exists to keep out of it.
+        """
         envelope = json.loads(raw)
         source, page = envelope["source"], envelope["page"]
         handler = {
             "mslearn": self._mslearn,
             "mitlearn": self._mitlearn,
             "freecodecamp": self._freecodecamp,
+            "csvideo": self._csvideo,
         }.get(source)
         if handler is None:
             _LOG.warning("no parser for source %r — page dropped", source)
             return []
-        return handler(json.loads(page))
+        return handler(page)
 
     # ── per-catalogue normalisers ─────────────────────────────────────────
-    def _mslearn(self, cat: dict) -> Iterable[dict]:
+    def _mslearn(self, page: str) -> Iterable[dict]:
         """Modules and learning paths, kept distinct.
 
         Two passes, because parent_uids may only name a container that is
@@ -90,6 +105,7 @@ class CoursesParser(IParser):
         those would fabricate a curriculum. An unresolved child simply gets no
         edge, and child_count vs len(child_uids) is what records the gap.
         """
+        cat = json.loads(page)
         records: list[dict] = []
         by_uid: dict[str, dict] = {}
 
@@ -138,8 +154,9 @@ class CoursesParser(IParser):
 
         return records
 
-    def _mitlearn(self, page: dict) -> Iterable[dict]:
+    def _mitlearn(self, raw: str) -> Iterable[dict]:
         """One page of free MIT Learn courses."""
+        page = json.loads(raw)
         for r in page.get("results", []):
             url = r.get("url") or r.get("learn_url")
             if not url:
@@ -169,14 +186,14 @@ class CoursesParser(IParser):
                 weekly_hours_min=r.get("min_weekly_hours"),
             )
 
-    def _freecodecamp(self, listing: list) -> Iterable[dict]:
+    def _freecodecamp(self, raw: str) -> Iterable[dict]:
         """Certifications, from the curriculum repo's superblock file names.
 
         The human-language courses (a1-professional-chinese and friends) are
         kept: dropping them is the dictionary's call downstream, where ROLES and
         LANGUAGES are already recorded exclusions, not a second filter here.
         """
-        for f in listing:
+        for f in json.loads(raw):
             name = f.get("name", "")
             if not name.endswith(".json"):
                 continue
@@ -194,3 +211,79 @@ class CoursesParser(IParser):
                 # record and none is invented.
                 content_kind="COURSE",
             )
+
+    def _csvideo(self, page: str) -> Iterable[dict]:
+        """cs-video-courses' README -> one record per course link.
+
+        The dialect is markdown, so the structure IS the document: a `### `
+        heading opens a subject section and every `- ` bullet under it is one
+        course. The table of contents is skipped without special-casing it,
+        because its bullets link to `#anchor` fragments and the pattern below
+        only accepts http(s).
+
+        Two shapes of bullet, both in the file:
+          - [<title>](<url>)                      most entries
+          - <title> | [Video Playlist](<url>)     title outside the link
+        The leading text wins when there is any, because that is where the
+        curator put the course's identity; the link text in the second shape is
+        a label ("Video Playlist"), not a title.
+
+        THE QUERY STRING IS KEPT, unlike mslearn where it is stripped. 674 of
+        these urls are youtube.com/playlist?list=..., where the parameter IS the
+        resource: stripping it would collapse every YouTube entry onto one id.
+
+        A url listed in several sections yields ONE record carrying both
+        sections as tags, not two rows -- the url is the identity, so a
+        duplicate would be the same course twice under two ids.
+        """
+        records: list[dict] = []
+        by_url: dict[str, dict] = {}
+        section: str | None = None
+
+        for line in page.splitlines():
+            if line.startswith("### "):
+                section = line[4:].strip()
+                continue
+            stripped = line.lstrip()
+            # A bullet before the first `### ` is front matter or the contents
+            # list, and belongs to no subject.
+            if section is None or not stripped.startswith("- "):
+                continue
+            body = stripped[2:].strip()
+            match = _MD_LINK.search(body)
+            if match is None:
+                continue
+            # Trailing sentence punctuation is the curator's, not the url's.
+            url = match.group(2).rstrip(".,")
+            lead = body[: match.start()].strip(" -|\t")
+            title = lead or match.group(1).strip()
+            if not title:
+                continue
+
+            seen = by_url.get(url)
+            if seen is not None:
+                if section not in seen["tags"]:
+                    seen["tags"].append(section)
+                continue
+            record = _record(
+                source="csvideo",
+                # A BOOKMARK LIST HAS NO PROVIDER. The host is the one
+                # provider fact the entry actually carries; the university is
+                # usually in the title too, but only usually, and parsing it
+                # out would be the guess this parser refuses elsewhere.
+                provider=urlsplit(url).netloc.lower().removeprefix("www."),
+                title=title,
+                url=url,
+                # The repo's premise is freely available video lectures
+                # (NOTES.md), which is the same claim is_free makes. No entry
+                # states a level, a duration or a licence, so all three stay at
+                # their absent defaults rather than being inferred.
+                tags=[section],
+                # Standalone: the list records no ordering and no container,
+                # so there is no hierarchy to carry.
+                content_kind="COURSE",
+            )
+            by_url[url] = record
+            records.append(record)
+
+        return records

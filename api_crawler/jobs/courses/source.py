@@ -1,6 +1,6 @@
 """Courses source: pull raw pages from the open course catalogues.
 
-Three catalogues, chosen by their terms rather than their size. Each one is
+Four catalogues, chosen by their terms rather than their size. Each one is
 recorded here with the check that let it in, because the next person to add a
 source needs to make the same check and not guess:
 
@@ -22,6 +22,33 @@ source needs to make the same check and not guess:
     names ARE the public curriculum paths, so the catalogue is derived from the
     repo rather than scraped off the site. robots.txt is `Allow: /`.
     https://github.com/freeCodeCamp/freeCodeCamp
+
+  csvideo — Developer-Y/cs-video-courses, a hand-curated index of ~1400
+    university-level CS courses with video lectures (85k stars). One 227 KB
+    README.md, fetched raw; the links point at MIT OCW, NPTEL, YouTube
+    university channels and the like, so this catalogue is a BOOKMARK LIST and
+    not a provider. It is the cheapest large gain in coverage for the
+    learning-path feature, which the API catalogues skew away from: they are
+    vendor training, and this is the academic curriculum.
+    https://github.com/Developer-Y/cs-video-courses
+
+    TERMS — THE WEAKEST OF THE FOUR, FLAGGED RATHER THAN BURIED. The repo
+    carries NO LICENSE file (checked 2026-11-09: root holds only README.md,
+    CONTRIBUTING.md, NOTES.md), so no reuse right is granted and default
+    copyright applies to the compilation. It was added anyway, on three
+    grounds, and the decision is the user's to revisit:
+      - what is taken is the FACTS of each entry — a course title and the URL
+        it points at. Those are references to third-party public courses, not
+        the repository's own prose; no description, comment or ordering of the
+        compilation is copied, and the parser writes no summary.
+      - NOTES.md states the list's intent is "to act as Online bookmarks/lookup
+        table for freely available online video courses", which is the use
+        made of it here.
+      - it is one file read over raw.githubusercontent.com under GitHub's own
+        terms, not a crawl of the repository or of the linked sites.
+    If that is not good enough, drop `csvideo` from `crawler.sources` in
+    data-contracts/contracts/producer/courses.yaml — no code change needed,
+    which is why the sources list is a contract field.
 
 DELIBERATELY EXCLUDED — F8 / fullstack.edu.vn, the obvious Vietnamese free
 source and the one that would most improve coverage. Its robots.txt sets
@@ -58,6 +85,9 @@ FCC_URL = (
     "https://api.github.com/repos/freeCodeCamp/freeCodeCamp"
     "/contents/curriculum/structure/superblocks"
 )
+CSVIDEO_URL = (
+    "https://raw.githubusercontent.com/Developer-Y/cs-video-courses/master/README.md"
+)
 
 
 class CoursesSource(ISource):
@@ -67,9 +97,9 @@ class CoursesSource(ISource):
         self._max_pages = max_pages
 
     # ── transport ─────────────────────────────────────────────────────────
-    def _get(self, url: str) -> str:
+    def _get(self, url: str, accept: str = "application/json") -> str:
         req = urllib.request.Request(
-            url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+            url, headers={"User-Agent": USER_AGENT, "Accept": accept}
         )
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             return resp.read().decode("utf-8")
@@ -97,6 +127,14 @@ class CoursesSource(ISource):
     def _freecodecamp(self) -> Iterable[str]:
         yield self._envelope("freecodecamp", self._get(FCC_URL))
 
+    def _csvideo(self) -> Iterable[str]:
+        """One README, fetched as text — the only non-JSON dialect here.
+
+        No pagination and no delay: it is a single file, so `max_pages` and
+        `delay` have nothing to apply to.
+        """
+        yield self._envelope("csvideo", self._get(CSVIDEO_URL, accept="text/plain"))
+
     # ── ISource ───────────────────────────────────────────────────────────
     def fetch(self) -> Iterable[str]:
         """Yield every catalogue's raw pages.
@@ -110,6 +148,7 @@ class CoursesSource(ISource):
             "mslearn": self._mslearn,
             "mitlearn": self._mitlearn,
             "freecodecamp": self._freecodecamp,
+            "csvideo": self._csvideo,
         }
         for name in self._sources:
             fetcher = fetchers.get(name)

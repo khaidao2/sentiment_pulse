@@ -3,10 +3,12 @@
 # postings, so this crawler stores no skills of its own (the dictionary lives in
 # reverse_etl, and matching happens there, where the job index is).
 #
-# Unlike the job crawlers this one reads published APIs, not HTML, so there is no
-# Cloudflare dance and no per-page delay beyond politeness. Sources are chosen by
-# their terms, not their size — see api_crawler/jobs/courses/source.py, which
-# records why each one is allowed and why fullstack.edu.vn is not.
+# Unlike the job crawlers this one reads published APIs and one curated index
+# file, not rendered HTML, so there is no Cloudflare dance and no per-page delay
+# beyond politeness. Sources are chosen by their terms, not their size — see
+# api_crawler/jobs/courses/source.py, which records why each one is allowed, why
+# csvideo's terms are the weakest of the four, and why fullstack.edu.vn is not
+# crawled at all.
 
 name: courses
 kind: producer
@@ -32,7 +34,11 @@ sink:
 crawler:
   # Comma-separated, so a source whose API breaks can be dropped from the run
   # without a code change or an image rebuild.
-  sources: mslearn,mitlearn,freecodecamp
+  #
+  # csvideo is the one whose terms are a judgement call rather than a licence
+  # (no LICENSE file in the repo — the reasoning is in source.py). Removing it
+  # from this line is the whole retraction: no code change, no image rebuild.
+  sources: mslearn,mitlearn,freecodecamp,csvideo
   delay: 0.2             # seconds between HTTP calls (MIT Learn is paginated)
   max_pages: 40          # pagination ceiling per source; MIT is ~30 pages of 100
 

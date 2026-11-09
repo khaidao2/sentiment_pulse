@@ -44,7 +44,7 @@ with DAG(
         env_vars=[
             k8s.V1EnvVar(name="KAFKA_TOPIC", value="sentiment-pulse.courses"),
             k8s.V1EnvVar(name="KAFKA_BOOTSTRAP_SERVERS", value="kafka.kafka.svc.cluster.local:9092"),
-            k8s.V1EnvVar(name="SOURCES", value="mslearn,mitlearn,freecodecamp"),
+            k8s.V1EnvVar(name="SOURCES", value="mslearn,mitlearn,freecodecamp,csvideo"),
             k8s.V1EnvVar(name="DELAY", value="0.2"),
             k8s.V1EnvVar(name="MAX_PAGES", value="40"),
         ],

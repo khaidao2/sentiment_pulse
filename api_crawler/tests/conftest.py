@@ -34,9 +34,14 @@ def schema() -> dict:
 
 
 # ── courses crawler ───────────────────────────────────────────────────────
-# The courses job reads three JSON catalogues rather than one HTML page, so its
+# The courses job reads four catalogues rather than one HTML page, so its
 # fixtures are per-source payloads and the parser is handed an envelope (see
 # jobs/courses/source.py for why the source name travels with the page).
+#
+# The fixture's EXTENSION carries the dialect: three are .json and csvideo is
+# the .md README. The loader globs rather than taking a suffix argument, so
+# adding a catalogue means dropping in a file, not editing this file.
+COURSES_SOURCES = ("mslearn", "mitlearn", "freecodecamp", "csvideo")
 
 
 @pytest.fixture
@@ -50,8 +55,10 @@ def courses_page():
     import json
 
     def _build(source: str) -> str:
-        page = (_FIXTURES / f"courses_{source}.json").read_text(encoding="utf-8")
-        return json.dumps({"source": source, "page": page})
+        matches = sorted(_FIXTURES.glob(f"courses_{source}.*"))
+        if len(matches) != 1:
+            raise AssertionError(f"courses_{source}.*: expected one fixture, got {matches}")
+        return json.dumps({"source": source, "page": matches[0].read_text(encoding="utf-8")})
 
     return _build
 
@@ -62,7 +69,4 @@ def courses_records(courses_page):
     from api_crawler.jobs.courses.parser import CoursesParser
 
     parser = CoursesParser()
-    return {
-        source: list(parser.parse(courses_page(source)))
-        for source in ("mslearn", "mitlearn", "freecodecamp")
-    }
+    return {source: list(parser.parse(courses_page(source))) for source in COURSES_SOURCES}
