@@ -1,0 +1,189 @@
+# codeops declared state — the project as it is meant to be understood.
+#
+# Facts are NOT declared here: sizes, languages and commit activity are derived
+# from the repository on every run. What lives here is intent a tool cannot
+# infer — what each part owns, what must stay true, and why.
+#
+# Every `paths`, `anchor` and `check` is verified. `codeops check` fails when a
+# declared path has vanished, when real source is claimed by no component, or
+# when an oracle stops exiting zero.
+#
+apiVersion: codeops/v1
+kind: Project
+metadata:
+  name: sentiment_pulse_clean
+  links:
+    repo: git@github.com:khaidao2/sentiment_pulse.git
+spec:
+  description: >-
+    A self-hosted data platform that crawls Vietnamese job, news and community
+    sites, streams the records through Kafka, lands them as Parquet on MinIO and
+    serves them from ClickHouse — all generated from one YAML contract per source
+    and deployed by GitOps onto a single node.
+
+  decisions:
+    - text: >-
+        The pipelines depend only on ports (zero-dependency ABCs) — ISource,
+        IParser, IPublisher for the producer and ISubscriber, ISink for the sink —
+        and concrete adapters are assembled only in each job's __main__.py.
+      because: >-
+        A new source or sink store is then a small isolated add behind an existing
+        seam, with no change to the pipeline, the ports or the consumer.
+      rejected:
+        - Letting the pipeline import its adapters directly — every new source
+          would then edit shared pipeline code, which is exactly the coupling the
+          layering test now forbids.
+      anchor:
+        - api_crawler/shared
+        - api_crawler/tests/test_architecture.py
+
+    - text: One MinioSink, with no shared IObjectStore abstraction above it.
+      because: >-
+        ISink is already the seam a second store would plug into, so the extra
+        layer would buy nothing until a second backend actually exists.
+      rejected:
+        - Extracting IObjectStore now, ahead of a second store — speculative
+          generality, an interface with a single implementation.
+
+    - text: >-
+        Each source is described by one YAML contract, and sent-gen renders it
+        into the Airflow DAG, the k8s manifests and the ClickHouse DDL. Config
+        flows one way: YAML -> sent-gen -> pod env vars -> the app reads env.
+      because: >-
+        The crawler and sink images never parse YAML, so they carry no coupling to
+        this repository's layout and the generated artefacts cannot drift from the
+        contract that produced them.
+      rejected:
+        - Having the images read the contracts at runtime — it would couple every
+          deployed image to this repo's directory layout and make the contract a
+          runtime dependency rather than a build input.
+      anchor:
+        - data-contracts/contracts
+        - data-contracts/src
+
+    - text: >-
+        Delivery is at-least-once — the sink commits Kafka offsets only after a
+        batch is durably written.
+      because: >-
+        A crash may re-deliver the last batch and duplicate Parquet rows, which is
+        acceptable in a raw landing zone and much cheaper than the alternative.
+      rejected:
+        - Exactly-once delivery, or de-duplicating in the raw zone — cost and
+          complexity the landing zone does not need; de-duplication belongs in the
+          dbt models that read it.
+      anchor:
+        - api_crawler/sink
+
+    - text: >-
+        Redpanda is used locally and Kafka in production, behind the same client
+        and the same image — only the broker address, an env var, changes.
+      because: >-
+        A local end-to-end run needs no separate code path, so the thing tested
+        locally is the thing deployed.
+
+  tasks:
+    lint: ruff check .
+    # Two suites, each run with its OWN directory as the working directory,
+    # which is what .github/workflows/ci.yml does via working-directory: the
+    # images set WORKDIR to the package dir, so the modules are top-level there
+    # and the imports under test match production. `pytest tests` from the repo
+    # root does not merely differ from that -- there is no top-level tests/, so
+    # it collects nothing and exits 4, which is what this line used to do.
+    # Subshells, so the task leaves the caller's working directory alone.
+    test: >-
+      (cd api_crawler && python -m pytest tests -q) &&
+      (cd reverse_etl && python -m pytest tests -q)
+    layering: >-
+      python -m pytest api_crawler/tests/test_architecture.py -q --noconftest
+      -p no:cacheprovider
+    mutation-gate: python scripts/mutation_gate.py
+
+  entrypoints:
+    - name: docker:.
+      path: Dockerfile
+      run: docker build .
+    - name: careerviet
+      path: api_crawler/jobs/careerviet
+      run: python -m api_crawler.jobs.careerviet
+    - name: courses
+      path: api_crawler/jobs/courses
+      run: python -m api_crawler.jobs.courses
+    - name: indeed
+      path: api_crawler/jobs/indeed
+      run: python -m api_crawler.jobs.indeed
+    - name: itviec
+      path: api_crawler/jobs/itviec
+      run: python -m api_crawler.jobs.itviec
+    - name: topcv
+      path: api_crawler/jobs/topcv
+      run: python -m api_crawler.jobs.topcv
+    - name: sink
+      path: api_crawler/sink
+      run: python -m api_crawler.sink
+    - name: docker:dbt
+      path: dbt/Dockerfile
+      run: docker build dbt
+    - name: docker:reverse_etl
+      path: reverse_etl/Dockerfile
+      run: docker build reverse_etl
+
+  components:
+    - name: api_crawler
+      owns: >-
+        The only application image: the per-source crawler (producer) and the
+        generic env-driven sink (consumer), plus the shared ports, the Avro/Kafka
+        and MinIO adapters, and their tests.
+      paths:
+        - api_crawler
+      invariants:
+        - text: >-
+            The pipelines and ports never import a concrete adapter — the
+            dependency arrows point inwards only.
+          check: >-
+            python -m pytest api_crawler/tests/test_architecture.py -q
+            --noconftest -p no:cacheprovider
+
+    - name: data-contracts
+      owns: >-
+        The control plane: one YAML contract per source, the Avro schemas, and the
+        sent-gen generator that renders each contract into an Airflow DAG, k8s
+        manifests and ClickHouse DDL.
+      paths:
+        - data-contracts
+
+    - name: dags
+      owns: >-
+        The generated Airflow DAGs that schedule the crawlers and the reverse-ETL
+        jobs. Generated output — edit the contract, not these files.
+      paths:
+        - dags
+
+    - name: dbt
+      owns: >-
+        The bronze and silver dbt models that turn the raw Parquet read from MinIO
+        into queryable ClickHouse tables.
+      paths:
+        - dbt
+
+    - name: reverse_etl
+      owns: >-
+        The jobs that push curated warehouse data back out to the web app's
+        normalized schema — the job, course, skill and role-family syncs, the
+        skill dictionary and the AI matcher.
+      paths:
+        - reverse_etl
+
+    - name: platform-gitops
+      owns: >-
+        The ArgoCD app-of-apps that deploys the single node: manifests, apps and
+        Helm values for MinIO, Kafka, ClickHouse, Keycloak, Airflow and the sinks.
+      paths:
+        - platform-gitops
+
+    - name: scripts
+      owns: >-
+        Operational scripts for the single-node platform — per-service Keycloak
+        client provisioning, secret rotation and resealing, and the CI
+        mutation-score gate.
+      paths:
+        - scripts
