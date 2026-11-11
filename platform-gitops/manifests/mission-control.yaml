@@ -105,6 +105,25 @@ spec:
                   key: secret_key
             # MinIO ignores the region, but boto3 refuses to sign a request
             # without one, so this is a literal rather than a secret.
+            # The A2A machine surface. Without A2A_ISSUER the application
+            # refuses every A2A call rather than falling open, because an
+            # unauthenticated write surface is worse than none.
+            - name: A2A_ISSUER
+              value: https://auth.sentpul.click/realms/data-platform
+            # Authorization, which the specification leaves to deployers. A
+            # verified token proves who is calling; this decides whether that
+            # caller may submit a mission at all. A mission runs an agent that
+            # writes files, so "any valid token in the realm" is the wrong rule.
+            - name: A2A_ALLOWED_CLIENTS
+              value: mission-control-peer
+            # Which agent backends a peer may ask for. omp only, which is the
+            # cheapest, rather than the Claude tenants.
+            - name: A2A_BACKENDS
+              value: omp
+            - name: A2A_WORKSPACE_SLUG
+              value: khaibaai
+            - name: A2A_PUBLIC_URL
+              value: https://mission-control.sentpul.click
             - name: S3_REGION
               value: us-east-1
           readinessProbe:
