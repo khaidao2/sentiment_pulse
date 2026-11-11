@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio-consumers-airflow
+  namespace: argocd
+  annotations:
+    # Wave 1, with the other credentials: airflow (wave 2) resolves
+    # airflow-s3-credentials into AIRFLOW_CONN_AWS_DEFAULT at boot, and the dbt
+    # task pods cannot be created without minio-credentials.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    # Deleting this Application must delete the SealedSecrets with it, rather
+    # than leaving them behind unmanaged -- which is exactly how the hand-made
+    # airflow-s3-credentials survived a root rotation that invalidated it.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    # A glob, not a filename: MinIO has one identity and every new consumer of
+    # it is another copy of the same credential. Adding one should be a file,
+    # not another Application.
+    directory:
+      include: 'minio-consumer-airflow-*-sealed-secret.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    # The Airflow components and the KPO task pods that consume these run here.
+    namespace: airflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

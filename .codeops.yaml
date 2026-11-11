@@ -177,8 +177,19 @@ spec:
       owns: >-
         The ArgoCD app-of-apps that deploys the single node: manifests, apps and
         Helm values for MinIO, Kafka, ClickHouse, Keycloak, Airflow and the sinks.
+        Also the credential inventory, which names the store that owns every
+        secret the platform runs on.
       paths:
         - platform-gitops
+      invariants:
+        - text: >-
+            Every credential the platform runs on is owned by a store that git
+            describes, and a credential with no store says in writing why.
+            A hand-made Secret that only exists in the cluster is invisible to
+            ArgoCD, so it survives a rotation that invalidates it and nothing
+            reports the breakage. That is what cost four days of Airflow task
+            logs on 2026-11-07.
+          check: python scripts/secrets_gate.py
 
     - name: scripts
       owns: >-

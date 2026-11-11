@@ -397,6 +397,14 @@ else
   # The 5 sinks and the transform DAGs read secret `minio-credentials`, which
   # is NOT in git and currently holds the same value as the root credential.
   # Rotating root without these breaks every sink, so they move together.
+  #
+  # `minio-credentials` is NOT the only consumer: airflow/airflow-s3-credentials
+  # carries the same credential as an Airflow connection URI, and this step has
+  # never known about it -- which is how the 2026-11-07 rotation silently killed
+  # every task log upload. It is not patched here because this step is now inert
+  # (minio.yaml already uses envFrom, so the guard above skips it); the consumer
+  # that owns that knowledge is scripts/reseal_minio_consumers.sh. Run it after
+  # any root rotation.
   for ns in database airflow; do
     if kubectl -n "$ns" get secret minio-credentials >/dev/null 2>&1; then
       kubectl -n "$ns" create secret generic minio-credentials \

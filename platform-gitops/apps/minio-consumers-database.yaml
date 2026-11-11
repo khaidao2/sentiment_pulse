@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio-consumers-database
+  namespace: argocd
+  annotations:
+    # Wave 1, before minio itself (wave 2) and the five sinks (wave 3): a sink
+    # pod cannot start without this credential.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    # Deleting this Application must delete the SealedSecret with it, rather
+    # than leaving it behind unmanaged.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    # A glob, not a filename: MinIO has one identity and every new consumer of
+    # it is another copy of the same credential. Adding one should be a file,
+    # not another Application.
+    directory:
+      include: 'minio-consumer-database-*-sealed-secret.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    # The five sinks that consume this run here, alongside MinIO itself.
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
