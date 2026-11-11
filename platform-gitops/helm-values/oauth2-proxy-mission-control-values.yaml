@@ -44,6 +44,26 @@ config:
     # carries email_verified=false. Accepting it is a deliberate choice for an
     # internal IdP, matching the cloudbeaver proxy.
     insecure_oidc_allow_unverified_email = true
+    # THE MACHINE SURFACE, past the browser gate.
+    #
+    # A peer machine has no browser and no session, so oauth2-proxy's redirect
+    # to Keycloak is not something it can follow. Measured: a verification run
+    # from khaibaai failed at its first step because even the Agent Card came
+    # back 403, and an agent nobody may discover without already being
+    # authorized is not discoverable.
+    #
+    # These two paths are NOT unauthenticated. The application verifies a
+    # Keycloak-issued bearer token against the realm's JWKS itself and refuses
+    # any client not in A2A_ALLOWED_CLIENTS. What is skipped is the browser
+    # login flow, not the check. The Agent Card genuinely is public, and holds
+    # no secret by design.
+    #
+    # Anchored on purpose. Without the $, /a2a-anything would also skip the
+    # gate, and this is the only write surface the product has.
+    skip_auth_routes = [
+        "^/\\.well-known/agent-card\\.json$",
+        "^/a2a$"
+    ]
 
 resources:
   requests:
