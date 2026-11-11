@@ -31,6 +31,15 @@ config:
     set_xauthrequest = true
     pass_user_headers = true
     cookie_secure = true
+    # PKCE, and it is required rather than optional. The Keycloak client that
+    # scripts/mission_control_keycloak.sh creates sets
+    # pkce.code.challenge.method = S256, so Keycloak rejects an authorization
+    # request without a code challenge and the callback arrives as
+    # "error=invalid_request&error_description=Missing+parameter%3A+code_challenge_method".
+    # That is what the first real login attempt hit. These two settings are one
+    # decision split across two files, so api_crawler/tests/test_dag_secrets.py
+    # now fails if either side carries PKCE alone.
+    code_challenge_method = "S256"
     # Keycloak users here are created by an admin without SMTP, so the id_token
     # carries email_verified=false. Accepting it is a deliberate choice for an
     # internal IdP, matching the cloudbeaver proxy.
