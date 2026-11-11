@@ -60,9 +60,30 @@ config:
     #
     # Anchored on purpose. Without the $, /a2a-anything would also skip the
     # gate, and this is the only write surface the product has.
+    #
+    # /mcp carries the same reasoning. An agent reaching it holds a Mission
+    # Control session key, which the application checks before any tool runs;
+    # a browser cookie is not something it could ever present. initialize and
+    # tools/list answer without a key on purpose, so a client can discover the
+    # server before it has one -- the same argument as the Agent Card.
+    #
+    # /api/cli/login-config is how `argus login` finds out WHERE to log in, so
+    # it must answer before the caller has any credential at all. It returns
+    # the issuer, the public client id and the device endpoints: all of it
+    # public by nature, and none of it usable without completing a login.
+    #
+    # The session-keys route is the trade itself: a Keycloak token in, a
+    # machine-scoped key out. The application verifies that token against the
+    # realm JWKS and refuses anything that is not a person from a known CLI
+    # client, so what is skipped here is again the browser flow, not the
+    # check. Anchored to /me/ so it cannot be stretched into another
+    # workspace's keys.
     skip_auth_routes = [
         "^/\\.well-known/agent-card\\.json$",
-        "^/a2a$"
+        "^/a2a$",
+        "^/mcp$",
+        "^/api/cli/login-config$",
+        "^/api/workspaces/[^/]+/me/session-keys$"
     ]
 
 resources:

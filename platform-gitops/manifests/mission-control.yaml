@@ -120,6 +120,18 @@ spec:
             # cheapest, rather than the Claude tenants.
             - name: A2A_BACKENDS
               value: omp
+            # Which Keycloak clients a PERSON may log in from, as opposed to
+            # the peer-to-peer clients above. A token from one of these is
+            # treated as a human, so it may trade itself for a session key;
+            # that is the whole of `argus login`. Kept separate from
+            # A2A_ALLOWED_CLIENTS on purpose: a peer machine submitting
+            # missions and a person logging in from a terminal are different
+            # privileges, and one list would grant both at once.
+            #
+            # A service account from this client is still refused, because a
+            # key that can mint keys is a key that never needs revoking.
+            - name: A2A_CLI_CLIENTS
+              value: mission-control-cli
             - name: A2A_WORKSPACE_SLUG
               value: khaibaai
             - name: A2A_PUBLIC_URL
