@@ -69,7 +69,7 @@ spec:
           # MUST stay identical to the migration Job's image. One artifact
           # serves both, so a mismatch between them is impossible by
           # construction only as long as both lines agree.
-          image: ghcr.io/khaidao2/mission-control:sha-d35cb17@sha256:6774096792e4e9aa2670cae3076496448aea905cf8efe99c13a3c6e76fff3b0a
+          image: ghcr.io/khaidao2/mission-control:sha-48067b1@sha256:045ffb802d68bdab1e883c1c06b084037eff6f8243d7bf8d1a78e03fa79fa26e
           # IfNotPresent, not Always: a digest already names exact bytes, so
           # re-pulling them on every restart buys nothing and costs a round trip
           # to a registry that may be unreachable when a node reboots.
