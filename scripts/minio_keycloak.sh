@@ -17,20 +17,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/keycloak_common.sh
 source "${SCRIPT_DIR}/keycloak_common.sh"
 
-# Must match MINIO_IDENTITY_OPENID_CLIENT_SECRET in manifests/minio.yaml.
-MINIO_SECRET="${MINIO_CLIENT_SECRET:-minio-keycloak-client-secret-key-1234}"
+# NO CLIENT SECRET HERE. This script used to carry one as a shell default, in
+# a PUBLIC repository, and omitting `secret` from the client representation is
+# what makes that unnecessary: Keycloak leaves an existing client's secret
+# alone on update. Keeping the default was also a live footgun, because a
+# re-run would have reset the client secret to a value anyone could read.
+#
+# To rotate a client secret, use scripts/rotate_keycloak_client_secret.sh,
+# which regenerates it in Keycloak, seals it, and never prints it.
 MINIO_URL="${MINIO_URL:-https://minio.sentpul.click}"
 
 kc_init
 
-kc_upsert_client "$(jq -n --arg s "$MINIO_SECRET" --arg u "$MINIO_URL" '{
+kc_upsert_client "$(jq -n --arg u "$MINIO_URL" '{
   clientId: "minio",
   name: "MinIO Console Client",
   enabled: true,
   protocol: "openid-connect",
   publicClient: false,
   clientAuthenticatorType: "client-secret",
-  secret: $s,
   standardFlowEnabled: true,
   redirectUris: [($u + "/*"), ($u + "/oauth_callback")],
   webOrigins: [$u],

@@ -10,7 +10,6 @@
 #   KC_PORT_FORWARD=1 ./scripts/grafana_keycloak.sh
 #
 # Env overrides:
-#   GRAFANA_CLIENT_SECRET   Keycloak client secret (default: value from grafana-values.yaml)
 #   GRAFANA_URL             Grafana public URL     (default: https://grafana.sentpul.click)
 #   (all KC_* vars from keycloak_common.sh are also respected)
 
@@ -18,15 +17,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/keycloak_common.sh
 source "${SCRIPT_DIR}/keycloak_common.sh"
 
-# Must match GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET in grafana-values.yaml.
-GRAFANA_SECRET="${GRAFANA_CLIENT_SECRET:-XP2t3V0jEDoVv8HGek6FbDkEOeQe7E7I}"
+# NO CLIENT SECRET HERE. This script used to carry one as a shell default, in
+# a PUBLIC repository, and omitting `secret` from the client representation is
+# what makes that unnecessary: Keycloak leaves an existing client's secret
+# alone on update. Keeping the default was also a live footgun, because a
+# re-run would have reset the client secret to a value anyone could read.
+#
+# To rotate a client secret, use scripts/rotate_keycloak_client_secret.sh,
+# which regenerates it in Keycloak, seals it, and never prints it.
 GRAFANA_URL="${GRAFANA_URL:-https://grafana.sentpul.click}"
 
 kc_init
 
 # ── Grafana OIDC client ───────────────────────────────────────────────────────
 # Grafana Generic OAuth callback path is /login/generic_oauth.
-kc_upsert_client "$(jq -n --arg s "$GRAFANA_SECRET" --arg u "$GRAFANA_URL" '{
+kc_upsert_client "$(jq -n --arg u "$GRAFANA_URL" '{
   clientId:                  "grafana",
   name:                      "Grafana (Generic OAuth)",
   description:               "SSO for grafana.sentpul.click",
@@ -34,7 +39,6 @@ kc_upsert_client "$(jq -n --arg s "$GRAFANA_SECRET" --arg u "$GRAFANA_URL" '{
   protocol:                  "openid-connect",
   publicClient:              false,
   clientAuthenticatorType:   "client-secret",
-  secret:                    $s,
   standardFlowEnabled:       true,
   implicitFlowEnabled:       false,
   directAccessGrantsEnabled: false,

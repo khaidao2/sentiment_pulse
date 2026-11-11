@@ -16,19 +16,25 @@ source "${SCRIPT_DIR}/keycloak_common.sh"
 
 # Must match SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENTSECRET
 # in manifests/kafka-ui.yaml.
-KAFKA_UI_SECRET="${KAFKA_UI_CLIENT_SECRET:-736d99c12362911eeb9837cc08dcc7d83fa2af3c20485851}"
+# NO CLIENT SECRET HERE. This script used to carry one as a shell default, in
+# a PUBLIC repository, and omitting `secret` from the client representation is
+# what makes that unnecessary: Keycloak leaves an existing client's secret
+# alone on update. Keeping the default was also a live footgun, because a
+# re-run would have reset the client secret to a value anyone could read.
+#
+# To rotate a client secret, use scripts/rotate_keycloak_client_secret.sh,
+# which regenerates it in Keycloak, seals it, and never prints it.
 KAFKA_UI_URL="${KAFKA_UI_URL:-https://kafka.sentpul.click}"
 
 kc_init
 
-kc_upsert_client "$(jq -n --arg s "$KAFKA_UI_SECRET" --arg u "$KAFKA_UI_URL" '{
+kc_upsert_client "$(jq -n --arg u "$KAFKA_UI_URL" '{
   clientId: "kafka-ui",
   name: "Kafka UI (native OIDC)",
   enabled: true,
   protocol: "openid-connect",
   publicClient: false,
   clientAuthenticatorType: "client-secret",
-  secret: $s,
   standardFlowEnabled: true,
   redirectUris: [($u + "/login/oauth2/code/keycloak")],
   webOrigins: [$u]

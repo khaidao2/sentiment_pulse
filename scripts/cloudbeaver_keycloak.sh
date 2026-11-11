@@ -10,20 +10,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/keycloak_common.sh
 source "${SCRIPT_DIR}/keycloak_common.sh"
 
-# Must match clientSecret in helm-values/oauth2-proxy-cloudbeaver-values.yaml.
-CLOUDBEAVER_SECRET="${CLOUDBEAVER_CLIENT_SECRET:-ec7b3de27e9af4bc08d35dad623abc9acd9081e2a310af45}"
+# NO CLIENT SECRET HERE. This script used to carry one as a shell default, in
+# a PUBLIC repository, and omitting `secret` from the client representation is
+# what makes that unnecessary: Keycloak leaves an existing client's secret
+# alone on update. Keeping the default was also a live footgun, because a
+# re-run would have reset the client secret to a value anyone could read.
+#
+# To rotate a client secret, use scripts/rotate_keycloak_client_secret.sh,
+# which regenerates it in Keycloak, seals it, and never prints it.
 CLOUDBEAVER_URL="${CLOUDBEAVER_URL:-https://cloudbeaver.sentpul.click}"
 
 kc_init
 
-kc_upsert_client "$(jq -n --arg s "$CLOUDBEAVER_SECRET" --arg u "$CLOUDBEAVER_URL" '{
+kc_upsert_client "$(jq -n --arg u "$CLOUDBEAVER_URL" '{
   clientId: "cloudbeaver",
   name: "CloudBeaver (oauth2-proxy)",
   enabled: true,
   protocol: "openid-connect",
   publicClient: false,
   clientAuthenticatorType: "client-secret",
-  secret: $s,
   standardFlowEnabled: true,
   redirectUris: [($u + "/oauth2/callback")],
   webOrigins: [$u]
