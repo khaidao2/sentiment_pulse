@@ -670,7 +670,7 @@ dashboards:
                 "w": 24,
                 "h": 6
               },
-              "description": "Scrape availability status of secrets platform components. Note: the sealed-secrets controller and Reloader are NOT scraped yet, on ports 8081 and 9090, so their absence here is a known gap and not a failure.",
+              "description": "Scrape availability for every target Prometheus knows about, including Vault, External Secrets, the sealed-secrets controller and Reloader. A value of 0 means that component is down or unreachable, and its panels above will show stale or missing data until it recovers.",
               "targets": [
                 {
                   "datasource": "Prometheus",
@@ -692,6 +692,379 @@ dashboards:
               "options": {
                 "showHeader": true,
                 "sortBy": []
+              }
+            },
+            {
+              "type": "row",
+              "title": "Sealed Secrets and Reloader",
+              "gridPos": {
+                "x": 0,
+                "y": 26,
+                "w": 24,
+                "h": 1
+              },
+              "id": 103
+            },
+            {
+              "id": 12,
+              "title": "Sealed Secrets controller",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 27,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Shows the running Sealed Secrets controller version. If it disappears, no new SealedSecret can be decrypted into a Secret, so credentials being created or rotated through git stop landing in the cluster until the controller is back. Existing Secrets keep working.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "count by (revision) (sealed_secrets_controller_build_info)",
+                  "refId": "A",
+                  "legendFormat": "{{revision}}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": null
+                      },
+                      {
+                        "color": "green",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 13,
+              "title": "SealedSecrets synced",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 6,
+                "y": 27,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Number of SealedSecrets the controller has decrypted and applied successfully. A drop means a credential is no longer being kept in sync with git; compare with the next panel to see whether it is a failure or a deletion.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "count(sealed_secrets_controller_condition_info{condition=\"Synced\"} == 1)",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 14,
+              "title": "SealedSecrets not synced",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 27,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Number of SealedSecrets whose last unseal failed, so the Secret they should produce is missing or stale. Anything above zero needs attention, usually a sealing key mismatch or a wrong namespace or name. Shows 0 when none are failing.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "count(sealed_secrets_controller_condition_info{condition=\"Synced\"} == 0) or vector(0)",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "red",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 15,
+              "title": "Unseal failures (1h)",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 18,
+                "y": 27,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Failed decryption attempts in the last hour. The controller only exposes the unseal errors counter after its first failure, so until then the series is absent and this query falls back to 0 instead of showing No data. Any value above zero means a SealedSecret could not be decrypted.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum(increase(sealed_secrets_controller_unseal_errors_total[1h])) or vector(0)",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "red",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 16,
+              "title": "Unseal requests per second",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 31,
+                "w": 8,
+                "h": 6
+              },
+              "description": "How often the controller attempts to decrypt SealedSecrets. Bursts follow commits that add or change sealed credentials or a controller restart; a sustained high rate on a quiet repo suggests a reconcile loop.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum(rate(sealed_secrets_controller_unseal_requests_total[5m]))",
+                  "refId": "A",
+                  "legendFormat": "unseal requests"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "barAlignment": 0,
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "id": 17,
+              "title": "Reloader events received and processed",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 8,
+                "y": 31,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Rate of Secret and ConfigMap changes Reloader sees against the rate it finishes handling. Received staying above processed for long means changes to credentials are queuing and workloads may keep using stale values.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum by (event_type) (rate(reloader_events_received_total[5m]))",
+                  "refId": "A",
+                  "legendFormat": "received {{event_type}}"
+                },
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum(rate(reloader_events_processed_total[5m]))",
+                  "refId": "B",
+                  "legendFormat": "processed"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "barAlignment": 0,
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "id": 18,
+              "title": "Reloader reconcile activity",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 16,
+                "y": 31,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Reconciles Reloader runs by outcome, with the current work queue depth. Errors, or a queue depth that stays above zero, mean workloads are not being restarted after their credentials rotate.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum by (result) (rate(reloader_reconcile_total[5m]))",
+                  "refId": "A",
+                  "legendFormat": "reconcile {{result}}"
+                },
+                {
+                  "datasource": "Prometheus",
+                  "expr": "sum(reloader_workqueue_depth)",
+                  "refId": "B",
+                  "legendFormat": "queue depth"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "barAlignment": 0,
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
               }
             }
           ]
