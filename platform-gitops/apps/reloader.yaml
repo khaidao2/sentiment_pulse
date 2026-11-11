@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reloader
+  namespace: argocd
+  annotations:
+    # Wave 1. It has to be watching before a rotation happens, and it depends
+    # on nothing but the API server.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    # Chart 2.2.20 is the newest STABLE release. The repository's newest tags
+    # are 3.0.0-beta.x, which a naive "latest" read would have picked.
+    - repoURL: 'https://stakater.github.io/stakater-charts'
+      chart: reloader
+      targetRevision: 2.2.20
+      helm:
+        releaseName: reloader
+        valueFiles:
+          - $values/platform-gitops/helm-values/reloader-values.yaml
+    - repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

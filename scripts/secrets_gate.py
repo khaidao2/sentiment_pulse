@@ -23,9 +23,13 @@ against that table and fails on any disagreement:
     a row with no live Secret    the inventory is claiming a credential the
                                  platform does not have.
 
-Only Opaque Secrets in the namespaces the inventory names are considered.
-Service-account tokens and helm release state are not credentials this platform
-owns, and they carry their own types.
+Opaque and dockerconfigjson Secrets in the namespaces the inventory names are
+considered. Service-account tokens and helm release state are not credentials
+this platform owns, and they carry their own types.
+
+dockerconfigjson is in scope because webapp/ghcr-pull is a hand-made registry
+credential that no manifest owns, and an Opaque-only filter could not see it.
+That is the same shape as the airflow-s3-credentials outage, one type along.
 
 Usage:
     python scripts/secrets_gate.py [--context sentpul] [--inventory PATH]
@@ -48,6 +52,9 @@ OWNER_FOR_STORE = {
     "vault-db": "ExternalSecret",
 }
 STORELESS_CLASSES = {"bootstrap", "chart"}
+# A registry pull credential is a credential. Keeping this to Opaque alone is
+# what let webapp/ghcr-pull sit unowned and unseen.
+IN_SCOPE_TYPES = {"Opaque", "kubernetes.io/dockerconfigjson"}
 COLUMNS = ("namespace", "name", "class", "store", "reason")
 
 
@@ -74,7 +81,7 @@ def read_inventory(path: Path) -> dict[tuple[str, str], dict[str, str]]:
 
 
 def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], list[str]]:
-    """Map (namespace, name) -> every owning kind, for Opaque Secrets in `namespaces`.
+    """Map (namespace, name) -> every owning kind, for in-scope Secrets in `namespaces`.
 
     Every kind, not just ownerReferences[0]. A Secret can carry more than one
     owner, and reading only the first lets the gate pass on a Secret whose
@@ -90,7 +97,7 @@ def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], li
         raise SystemExit(f"kubectl failed: {out.stderr.strip()}")
     live: dict[tuple[str, str], list[str]] = {}
     for item in json.loads(out.stdout)["items"]:
-        if item.get("type") != "Opaque":
+        if item.get("type") not in IN_SCOPE_TYPES:
             continue
         meta = item["metadata"]
         if meta["namespace"] not in namespaces:
