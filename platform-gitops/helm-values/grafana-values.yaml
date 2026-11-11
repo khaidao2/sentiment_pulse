@@ -87,3 +87,613 @@ dashboards:
       revision: 1
       datasource: Prometheus
 
+    # The credential plane: Vault, External Secrets, and the scrape health that
+    # says whether this page can be trusted at all.
+    #
+    # Every panel query was run against this Prometheus before it was committed
+    # and all eleven returned series. A panel pointing at a metric that does not
+    # exist renders "No data", which looks like an outage rather than a mistake,
+    # so the metric names here are measured and not assumed.
+    #
+    # Inline rather than gnetId because there is no community dashboard for this
+    # platform's own credential plane, and inline rather than a sidecar
+    # ConfigMap because this chart is configured with the file provider and
+    # adding the sidecar would be a second way to do one thing.
+    secrets-platform:
+      json: |-
+        {
+          "schemaVersion": 39,
+          "title": "Secrets and credential plane",
+          "uid": "secrets-plane",
+          "tags": [
+            "secrets",
+            "vault",
+            "eso"
+          ],
+          "timezone": "browser",
+          "editable": true,
+          "refresh": "30s",
+          "time": {
+            "from": "now-6h",
+            "to": "now"
+          },
+          "timepicker": {},
+          "templating": {
+            "list": []
+          },
+          "annotations": {
+            "list": []
+          },
+          "panels": [
+            {
+              "type": "row",
+              "title": "Vault",
+              "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 1
+              },
+              "id": 100
+            },
+            {
+              "id": 1,
+              "title": "Seal status",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 1,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Indicates whether the Vault storage barrier is unsealed and operational, allowing read and write operations.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_core_unsealed",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "SEALED",
+                          "color": "red",
+                          "index": 1
+                        },
+                        "1": {
+                          "text": "Unsealed",
+                          "color": "green",
+                          "index": 0
+                        }
+                      }
+                    }
+                  ],
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": null
+                      },
+                      {
+                        "color": "green",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "wideDisplay": true
+              }
+            },
+            {
+              "id": 2,
+              "title": "Live leases",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 6,
+                "y": 1,
+                "w": 6,
+                "h": 4
+              },
+              "description": "A lease count of zero means no dynamic credentials have been issued yet, so it is expected until the database secrets engine is in use.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_expire_num_leases",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 3,
+              "title": "Active node",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 1,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Shows whether this Vault cluster node is currently the active leader handling write and coordination requests.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_core_active",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Standby",
+                          "color": "blue",
+                          "index": 1
+                        },
+                        "1": {
+                          "text": "Active",
+                          "color": "green",
+                          "index": 0
+                        }
+                      }
+                    }
+                  ],
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "blue",
+                        "value": null
+                      },
+                      {
+                        "color": "green",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 7,
+              "title": "Mounted engines",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 18,
+                "y": 1,
+                "w": 6,
+                "h": 4
+              },
+              "description": "Total number of secret engines and auth methods mounted across Vault instances.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_core_mount_table_num_entries",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "mappings": [],
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto"
+              }
+            },
+            {
+              "id": 4,
+              "title": "In flight requests",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 5,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Number of concurrent HTTP requests currently being processed by Vault endpoints.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_core_in_flight_requests",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "barAlignment": 0,
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "id": 5,
+              "title": "Heap bytes",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 8,
+                "y": 5,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Heap memory allocated by the Vault process runtime over time.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "vault_runtime_alloc_bytes",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "unit": "bytes",
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "id": 6,
+              "title": "Barrier reads per second",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 16,
+                "y": 5,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Storage barrier read throughput servicing internal Vault queries and leases.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "rate(vault_barrier_get_count[5m])",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "type": "row",
+              "title": "External Secrets",
+              "gridPos": {
+                "x": 0,
+                "y": 11,
+                "w": 24,
+                "h": 1
+              },
+              "id": 101
+            },
+            {
+              "id": 8,
+              "title": "Store readiness",
+              "type": "table",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 12,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Reflects whether External Secrets Operator successfully validates connection, authentication, and readiness for the cluster secret store.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "clustersecretstore_status_condition{condition=\"Ready\"}",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "mappings": []
+                },
+                "overrides": []
+              },
+              "options": {
+                "showHeader": true,
+                "sortBy": []
+              }
+            },
+            {
+              "id": 9,
+              "title": "Provider API calls per second",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 8,
+                "y": 12,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Rate of API requests made to external secret providers, categorized by response status to expose failures alongside successes.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "rate(externalsecret_provider_api_calls_count[5m])",
+                  "legendFormat": "{{status}} ({{provider}} - {{call}})",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              }
+            },
+            {
+              "id": 10,
+              "title": "Reconcile duration",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 16,
+                "y": 12,
+                "w": 8,
+                "h": 6
+              },
+              "description": "Duration distribution of cluster secret store reconciliation cycles.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "clustersecretstore_reconcile_duration",
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "fillOpacity": 10
+                  },
+                  "unit": "s",
+                  "color": {
+                    "mode": "palette-classic"
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                }
+              }
+            },
+            {
+              "type": "row",
+              "title": "Scrape health",
+              "gridPos": {
+                "x": 0,
+                "y": 18,
+                "w": 24,
+                "h": 1
+              },
+              "id": 102
+            },
+            {
+              "id": 11,
+              "title": "Targets up",
+              "type": "table",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 19,
+                "w": 24,
+                "h": 6
+              },
+              "description": "Scrape availability status of secrets platform components. Note: the sealed-secrets controller and Reloader are NOT scraped yet, on ports 8081 and 9090, so their absence here is a known gap and not a failure.",
+              "targets": [
+                {
+                  "datasource": "Prometheus",
+                  "expr": "up",
+                  "instant": true,
+                  "range": false,
+                  "refId": "A"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "mappings": []
+                },
+                "overrides": []
+              },
+              "options": {
+                "showHeader": true,
+                "sortBy": []
+              }
+            }
+          ]
+        }
+
