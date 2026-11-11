@@ -12,6 +12,10 @@ metadata:
   labels:
     app: mission-control
   annotations:
+    # Wave 1, after the migration Job in wave 0. ArgoCD waits for a wave to be
+    # healthy before the next, so a failed migration leaves this Deployment
+    # UNSYNCED rather than starting pods against a schema that did not apply.
+    argocd.argoproj.io/sync-wave: "1"
     # Rotating either credential has to restart this pod, because the API reads
     # both from env at boot. Without this, a rotation serves a credential the
     # process never reads.
@@ -40,10 +44,20 @@ spec:
         fsGroup: 10001
       containers:
         - name: api
-          # CI rewrites this tag. The sed in build-image.yml anchors on the
-          # image name, so the value here only matters before the first pin.
-          image: ghcr.io/khaidao2/mission-control:sha-unpinned
-          imagePullPolicy: Always
+          # Tag AND digest. The tag says which commit this is for a human
+          # reading the manifest; the digest is what actually gets pulled, so
+          # the same bytes run every time even if the tag moves or is deleted.
+          # Never `latest`: it makes "which commit is serving" unanswerable,
+          # which is the failure the web app's build workflow was created to end.
+          #
+          # MUST stay identical to the migration Job's image. One artifact
+          # serves both, so a mismatch between them is impossible by
+          # construction only as long as both lines agree.
+          image: ghcr.io/khaidao2/mission-control:sha-5a784c2@sha256:8d3e3f3c17969a2dfd91cdeb5fe0eec35d960cd0fb73dfdbb2a30e49df488708
+          # IfNotPresent, not Always: a digest already names exact bytes, so
+          # re-pulling them on every restart buys nothing and costs a round trip
+          # to a registry that may be unreachable when a node reboots.
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
               name: http
