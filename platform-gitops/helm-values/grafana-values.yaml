@@ -11,6 +11,15 @@ envFromSecrets:
   - name: grafana-oauth-sealed
   - name: grafana-clickhouse-ds-sealed
 
+# Restart Grafana when either of those Secrets changes. Load bearing, and it
+# was missing: envFromSecrets becomes env vars, which are read once at process
+# start, so rotating the OIDC client secret updated the Secret and changed
+# nothing Grafana used. It would have kept presenting a dead credential to
+# Keycloak until someone restarted it by hand. Same failure the cloudflared
+# ConfigMap had, same fix.
+annotations:
+  secret.reloader.stakater.com/reload: "grafana-oauth-sealed,grafana-clickhouse-ds-sealed"
+
 persistence:
   enabled: true
   size: 1Gi
