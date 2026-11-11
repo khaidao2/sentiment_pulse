@@ -31,7 +31,7 @@ NS=mission-control
 BUCKET=mission-control
 PG_DB=mission_control
 PG_USER=mission_control
-INV=platform-gitops/secrets-inventory.tsv
+CREDS=platform-gitops/credentials
 
 k(){ kubectl --context sentpul "$@"; }
 seal_stdin(){ kubeseal --context sentpul --format yaml; }
@@ -40,6 +40,24 @@ ok(){ printf '  %s✓%s %s\n' "$C_G" "$C_0" "$*"; }
 warn(){ printf '  %s!%s %s\n' "$C_Y" "$C_0" "$*"; }
 die(){ printf '\n%sFAILED:%s %s\n' $'\e[31m' "$C_0" "$*" >&2; exit 1; }
 strong(){ openssl rand -base64 36 | tr -d '\n=+/' | cut -c1-32; }
+
+# Declare a credential this script creates. The gate fails on a credential with
+# no declaration, and a step a person has to remember is a step that gets
+# skipped. One file per credential, named for the credential, which is the
+# invariant the gate checks.
+declare_credential(){ # <namespace> <name> <class> <store> [reason]
+  local ns="$1" name="$2" klass="$3" store="$4" reason="${5:-}"
+  local dir=platform-gitops/credentials
+  local f="$dir/${ns}.${name}.yaml"
+  [ -d "$dir" ] || { warn "$dir does not exist, so $ns/$name was not declared"; return 0; }
+  [ -f "$f" ] && return 0
+  { echo "namespace: $ns"
+    echo "name: $name"
+    echo "class: $klass"
+    echo "store: $store"
+    echo "reason: \"$reason\""; } > "$f"
+  ok "declared $ns/$name in $f"
+}
 
 for t in kubectl kubeseal openssl; do command -v $t >/dev/null || die "missing tool: $t"; done
 k get nodes >/dev/null 2>&1 || die "kube context 'sentpul' unreachable"
@@ -97,6 +115,7 @@ if [ -n "$PG_PASS" ]; then
     > "$MF/mission-control-postgres-sealed-secret.yaml"
   k apply -f "$MF/mission-control-postgres-sealed-secret.yaml" >/dev/null
   ok "sealed and applied $NS/mission-control-postgres-credentials"
+  declare_credential "$NS" mission-control-postgres-credentials rotatable vault-db
 else
   warn "role existed, so no DSN was sealed. Delete the role and re-run to rotate it."
 fi
@@ -171,6 +190,7 @@ if [ -n "$MC_SK" ]; then
     > "$MF/mission-control-s3-sealed-secret.yaml"
   k apply -f "$MF/mission-control-s3-sealed-secret.yaml" >/dev/null
   ok "sealed and applied $NS/mission-control-s3-credentials"
+  declare_credential "$NS" mission-control-s3-credentials rotatable vault-kv
 fi
 
 # Prove the new identity actually works, rather than trusting that it was made.
@@ -217,13 +237,14 @@ cat <<'NEXT'
 
      then seal the secret it prints, as that script instructs.
 
-  4. Add one inventory row per credential you sealed, or
-     scripts/secrets_gate.py fails on a credential with no declared store:
+  4. Declare each credential you sealed as its own file under
+     platform-gitops/credentials/, or scripts/secrets_gate.py fails on a
+     credential with no declared store. The bootstrap writes the two it
+     creates; these are the ones left to you:
 
-       mission-control	mission-control-postgres-credentials	rotatable	sealed
-       mission-control	mission-control-s3-credentials	persistent	sealed
-       mission-control	mission-control-oidc	persistent	sealed
-       mission-control	ghcr-pull	persistent	sealed
+       platform-gitops/credentials/mission-control.ghcr-pull.yaml
+
+     Each file holds namespace, name, class, store and reason.
 
   5. Commit every generated manifest under platform-gitops/manifests/, or
      ArgoCD selfHeal will revert what this script applied.
