@@ -1,0 +1,134 @@
+# Mission Control, the Agent Operations Platform.
+#
+# Its credentials come from two SealedSecrets that
+# scripts/mission_control_bootstrap.sh creates. It has its OWN database and its
+# own bucket-scoped MinIO identity, not the web app's database and not the MinIO
+# root credential every other client here uses.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mission-control
+  namespace: mission-control
+  labels:
+    app: mission-control
+  annotations:
+    # Rotating either credential has to restart this pod, because the API reads
+    # both from env at boot. Without this, a rotation serves a credential the
+    # process never reads.
+    secret.reloader.stakater.com/reload: "mission-control-postgres-credentials,mission-control-s3-credentials"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mission-control
+  template:
+    metadata:
+      labels:
+        app: mission-control
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      # ghcr.io/khaidao2/* answers 401, so the package is private and the node
+      # cannot pull without this.
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          # CI rewrites this tag. The sed in build-image.yml anchors on the
+          # image name, so the value here only matters before the first pin.
+          image: ghcr.io/khaidao2/mission-control:sha-unpinned
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-postgres-credentials
+                  key: dsn
+            - name: S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: endpoint
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: bucket
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: access_key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: secret_key
+            # MinIO ignores the region, but boto3 refuses to sign a request
+            # without one, so this is a literal rather than a secret.
+            - name: S3_REGION
+              value: us-east-1
+          readinessProbe:
+            # /readyz checks the database, so this gates traffic on the thing
+            # that actually has to work.
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            # /healthz touches no database on purpose. A database blip must not
+            # restart a process that is otherwise fine.
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # LOAD-BEARING. The S3 adapter spools an upload through a
+            # SpooledTemporaryFile so it can hash the bytes and do a multipart
+            # upload without holding the object in memory. With a read-only root
+            # filesystem and no writable tmp, every upload above the spool
+            # threshold fails at the point it touches disk.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mission-control
+  namespace: mission-control
+spec:
+  type: ClusterIP
+  selector:
+    app: mission-control
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
