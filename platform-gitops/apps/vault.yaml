@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+  annotations:
+    # Wave 0. Vault serves credentials, so it comes up before the credential
+    # Applications in wave 1 and long before the services in wave 2.
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    # Chart 0.32.0 ships Vault 1.21.2, the last of the 1.x line. Chart 0.34.1
+    # ships Vault 2.0.4. The 2.0 bootstrap flow and values schema are not
+    # something this repo has verified, and a secrets store is the wrong place
+    # to find out at `vault operator init`. Moving to 2.x is its own change
+    # with its own verification.
+    - repoURL: 'https://helm.releases.hashicorp.com'
+      chart: vault
+      targetRevision: 0.32.0
+      helm:
+        valueFiles:
+          - $values/platform-gitops/helm-values/vault-values.yaml
+    - repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

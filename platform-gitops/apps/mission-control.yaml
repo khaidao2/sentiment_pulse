@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mission-control
+  namespace: argocd
+  annotations:
+    # Wave 2, after its credentials in wave 1 and its database.
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    # Deleting this Application must delete the workload with it, rather than
+    # leaving an unmanaged Deployment behind, which is what happened when
+    # wepower-web was removed on 2026-10-29.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # The manifests live HERE, not in the mission-control repo, which is the
+    # same split the web app uses. ArgoCD holds one repository credential and it
+    # is scoped to this repo's URL, so pointing an Application at a second
+    # private repo would need a second credential and would fail to render
+    # until someone added it. The application repo is read by CI, which pins the
+    # image sha into these manifests.
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'mission-control*.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: mission-control
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
