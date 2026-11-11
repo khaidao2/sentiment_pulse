@@ -49,6 +49,12 @@ kind: Deployment
 metadata:
   name: cloudflared
   namespace: kube-system
+  annotations:
+    # cloudflared parses config.yaml once at startup. Without this, adding a
+    # hostname above updates the ConfigMap and changes nothing, and the new
+    # hostname answers 404 from the catch-all rule until a human restarts this
+    # pod. That is exactly what happened to mission-control.sentpul.click.
+    configmap.reloader.stakater.com/reload: cloudflared-config
   labels:
     app: cloudflared
 spec:
