@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-unsealer
+  namespace: argocd
+  annotations:
+    # Wave 1, after the Vault server in wave 0. It tolerates an absent server
+    # by design, so the ordering is about clarity rather than correctness.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'vault-unsealer.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

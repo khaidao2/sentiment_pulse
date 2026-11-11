@@ -1,0 +1,95 @@
+# Vault holds the credentials that ROTATE. Persistent credentials stay in
+# SealedSecrets, which platform-gitops/secrets-inventory.tsv records per
+# credential.
+#
+# MinIO and ClickHouse have no Vault secrets engine, so for those Vault is a KV
+# store with a rotation script in front of it. PostgreSQL is the one place a
+# real dynamic engine exists, and it is the reason this component earns its
+# place at all, together with the audit log of credential reads.
+
+global:
+  # No TLS inside the cluster. Every client is a pod on the same node, and the
+  # only ingress is a port-forward. Adding TLS here would mean a cert the
+  # sealed-secrets controller does not manage and a renewal nobody owns.
+  tlsDisable: true
+
+injector:
+  # OFF. External Secrets Operator materialises Vault values into ordinary
+  # Kubernetes Secrets, which is how every consumer here already reads its
+  # credential. The injector would add a mutating webhook and a sidecar per pod
+  # for a delivery path nothing uses, and a sealed Vault would then block pod
+  # startup instead of only blocking refresh.
+  enabled: false
+
+csi:
+  enabled: false
+
+ui:
+  enabled: true
+  # ClusterIP only. No Ingress and no cloudflared route, so the UI is reachable
+  # with `kubectl port-forward` and is not another public surface to defend.
+  serviceType: ClusterIP
+
+server:
+  standalone:
+    enabled: false
+
+  # Raft with ONE replica, not standalone with file storage. Raft gives
+  # `vault operator raft snapshot save`, an online backup of a secrets store.
+  # File storage's only backup is a copy of a live file on a PVC, which is the
+  # kind of backup you discover is useless at restore time.
+  ha:
+    enabled: true
+    replicas: 1
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+
+        listener "tcp" {
+          address         = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_disable     = true
+
+          telemetry {
+            # Prometheus scrapes /v1/sys/metrics with no token. These are
+            # counters and gauges, not secret material, and the alternative is
+            # a long-lived scrape token that nothing would rotate.
+            unauthenticated_metrics_access = true
+          }
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+        }
+
+        service_registration "kubernetes" {}
+
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname         = true
+        }
+
+  dataStorage:
+    enabled: true
+    size: 2Gi
+    storageClass: local-path
+
+  # The Kubernetes auth method reviews a pod's service-account token, which
+  # needs the TokenReview API. Without this, ESO cannot log in to Vault at all.
+  authDelegator:
+    enabled: true
+
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8200"
+    prometheus.io/path: /v1/sys/metrics
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

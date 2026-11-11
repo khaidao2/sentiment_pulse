@@ -1,0 +1,92 @@
+# Vault seals itself on every restart. Without something to unseal it, a node
+# reboot leaves every Vault-backed credential unreadable until a human types
+# three keys, which on a single-node cluster means the sinks and Airflow wait
+# for a person.
+#
+# THE TRADEOFF, STATED. The unseal keys live in a SealedSecret, so they are
+# protected by the same controller key that already protects every other
+# credential here. Vault therefore buys rotation and an audit log of credential
+# reads, NOT stronger secrecy at rest than the platform already had. The
+# operator chose this over manual unseal, which is stronger at rest and leaves
+# the platform down after any reboot, and over transit auto-unseal, which needs
+# a second Vault this platform does not have.
+#
+# WHY THE HEADLESS SERVICE. A sealed Vault pod fails its readiness probe, so the
+# `vault` Service has no endpoints while it is sealed and a client aimed there
+# would never reach the thing it needs to unseal. `vault-internal` is headless
+# with publishNotReadyAddresses, so it resolves a sealed pod. Aiming this at
+# `vault` instead is the mistake that makes an unsealer look correct and never
+# fire.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-unsealer
+  namespace: vault
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-unsealer
+  namespace: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-unsealer
+  template:
+    metadata:
+      labels:
+        app: vault-unsealer
+    spec:
+      serviceAccountName: vault-unsealer
+      containers:
+        - name: unsealer
+          # The same image the server runs, so the `vault` CLI matches the
+          # server version and no second thing needs upgrading in step.
+          image: hashicorp/vault:1.21.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: VAULT_ADDR
+              value: http://vault-0.vault-internal.vault.svc.cluster.local:8200
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -u
+              # `vault status` exits 0 unsealed, 2 sealed, 1 unreachable. Using
+              # the documented exit code avoids parsing JSON, which would need
+              # a tool this image does not ship.
+              while true; do
+                vault status >/dev/null 2>&1
+                rc=$?
+                if [ "$rc" -eq 2 ]; then
+                  echo "vault is sealed, submitting unseal keys"
+                  for f in /vault/unseal-keys/key1 /vault/unseal-keys/key2 /vault/unseal-keys/key3; do
+                    [ -s "$f" ] || { echo "missing $f"; continue; }
+                    vault operator unseal "$(cat "$f")" >/dev/null 2>&1 || true
+                  done
+                  vault status >/dev/null 2>&1 && echo "vault is unsealed"
+                elif [ "$rc" -eq 1 ]; then
+                  echo "vault unreachable, retrying"
+                fi
+                sleep 15
+              done
+          volumeMounts:
+            - name: unseal-keys
+              mountPath: /vault/unseal-keys
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: unseal-keys
+          secret:
+            # Mounted as files rather than read through the API, so this
+            # workload needs no RBAC at all and the keys never reach argv or an
+            # environment variable.
+            secretName: vault-unseal-keys
+            optional: true
