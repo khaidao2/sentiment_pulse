@@ -192,3 +192,50 @@ def test_every_sealed_secret_manifest_has_an_application_serving_it(manifest):
         f"includes it, so ArgoCD never syncs it; the include globs are "
         f"{sorted(includes)}"
     )
+
+
+def _pkce_required_services() -> list[str]:
+    """Service slugs whose Keycloak bootstrap script requires PKCE.
+
+    Derived from the script FILENAME, not from a clientId regex inside it. The
+    first version matched `clientId: "..."` and silently found nothing in
+    skillbridge_keycloak.sh, which passes the id through a jq variable. A guard
+    that quietly covers two of three scripts is worse than no guard, because it
+    reports green. The filename is always there.
+    """
+    return [
+        path.name[: -len("_keycloak.sh")].replace("_", "-")
+        for path in sorted((REPO / "scripts").glob("*_keycloak.sh"))
+        if "pkce.code.challenge.method" in path.read_text()
+    ]
+
+
+@pytest.mark.parametrize("client_id", _pkce_required_services())
+def test_pkce_required_clients_have_a_proxy_that_sends_pkce(client_id):
+    """A client that demands PKCE and a proxy that omits it cannot log anyone in.
+
+    scripts/mission_control_keycloak.sh sets pkce.code.challenge.method = S256
+    on the mission-control client. The oauth2-proxy in front of it had no
+    code_challenge_method, so Keycloak refused every authorization request and
+    the callback came back as
+
+        error=invalid_request&error_description=Missing+parameter: code_challenge_method
+
+    which oauth2-proxy renders as a bare 403 page. Nothing in that page names
+    PKCE, and both halves looked correct in isolation: the client was more
+    secure than required, the proxy matched the cloudbeaver proxy that works.
+    It is one decision living in two files, which is the shape this file exists
+    to catch.
+
+    THE REVERSE IS NOT CHECKED, on purpose. A proxy that sends PKCE to a client
+    that does not require it still authenticates, because PKCE is additive. Only
+    the client-requires-and-proxy-omits direction is broken, so only that
+    direction is asserted.
+    """
+    values = REPO / "platform-gitops" / "helm-values" / f"oauth2-proxy-{client_id}-values.yaml"
+    if not values.is_file():
+        pytest.skip(f"no oauth2-proxy fronts the {client_id} client")
+    assert "code_challenge_method" in values.read_text(), (
+        f"the {client_id} Keycloak client requires PKCE, so {values.name} must set "
+        'code_challenge_method = "S256" or no login through it can succeed'
+    )
