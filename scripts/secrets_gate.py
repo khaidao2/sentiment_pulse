@@ -73,11 +73,13 @@ def read_inventory(path: Path) -> dict[tuple[str, str], dict[str, str]]:
     return rows
 
 
-def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], str]:
-    """Map (namespace, name) -> owning kind, for Opaque Secrets in `namespaces`.
+def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], list[str]]:
+    """Map (namespace, name) -> every owning kind, for Opaque Secrets in `namespaces`.
 
-    The owning kind is "" when nothing owns the Secret, which is the state this
-    gate exists to catch.
+    Every kind, not just ownerReferences[0]. A Secret can carry more than one
+    owner, and reading only the first lets the gate pass on a Secret whose
+    declared store is nowhere in the list. An empty list is the state this gate
+    exists to catch.
     """
     out = subprocess.run(
         ["kubectl", "--context", context, "get", "secrets", "--all-namespaces", "-o", "json"],
@@ -86,7 +88,7 @@ def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], st
     )
     if out.returncode != 0:
         raise SystemExit(f"kubectl failed: {out.stderr.strip()}")
-    live: dict[tuple[str, str], str] = {}
+    live: dict[tuple[str, str], list[str]] = {}
     for item in json.loads(out.stdout)["items"]:
         if item.get("type") != "Opaque":
             continue
@@ -94,20 +96,18 @@ def read_cluster(context: str, namespaces: set[str]) -> dict[tuple[str, str], st
         if meta["namespace"] not in namespaces:
             continue
         owners = meta.get("ownerReferences") or []
-        live[(meta["namespace"], meta["name"])] = owners[0]["kind"] if owners else ""
+        live[(meta["namespace"], meta["name"])] = [o["kind"] for o in owners]
     return live
 
 
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
-    ap.add_argument("--context", default=DEFAULT_CONTEXT)
-    args = ap.parse_args(argv)
+def compare(
+    rows: dict[tuple[str, str], dict[str, str]],
+    live: dict[tuple[str, str], list[str]],
+) -> list[str]:
+    """Join the declared state against the live one and name every disagreement.
 
-    rows = read_inventory(args.inventory)
-    namespaces = {ns for ns, _ in rows}
-    live = read_cluster(args.context, namespaces)
-
+    Pure, so the branches can be exercised without a cluster.
+    """
     violations: list[str] = []
 
     for key, row in sorted(rows.items()):
@@ -116,7 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         if key not in live:
             violations.append(f"{ns}/{name}: declared in the inventory but no such Secret exists")
             continue
-        owner = live[key]
+        owners = live[key]
+        have = ", ".join(owners) if owners else "nothing"
         if store == "none":
             if klass not in STORELESS_CLASSES:
                 violations.append(
@@ -125,9 +126,9 @@ def main(argv: list[str] | None = None) -> int:
                 )
             elif not reason.strip():
                 violations.append(f"{ns}/{name}: store=none needs a reason in the inventory")
-            elif owner:
+            elif owners:
                 violations.append(
-                    f"{ns}/{name}: inventory says nothing owns it, but {owner} does"
+                    f"{ns}/{name}: inventory says nothing owns it, but {have} does"
                 )
             continue
         want = OWNER_FOR_STORE.get(store)
@@ -136,8 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{ns}/{name}: unknown store '{store}', expected one of "
                 f"{'/'.join(sorted(OWNER_FOR_STORE))}/none"
             )
-        elif owner != want:
-            have = owner or "nothing"
+        elif want not in owners:
             violations.append(f"{ns}/{name}: store={store} wants a {want} owner, {have} owns it")
 
     for key in sorted(live):
@@ -147,6 +147,18 @@ def main(argv: list[str] | None = None) -> int:
                 f"{ns}/{name}: exists in the cluster with no inventory row. "
                 "This is the shape of the 2026-11-07 outage."
             )
+
+    return violations
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
+    ap.add_argument("--context", default=DEFAULT_CONTEXT)
+    args = ap.parse_args(argv)
+
+    rows = read_inventory(args.inventory)
+    violations = compare(rows, read_cluster(args.context, {ns for ns, _ in rows}))
 
     declared = len(rows)
     if violations:
