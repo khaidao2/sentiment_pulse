@@ -57,6 +57,15 @@ spec:
         app: mission-control
         component: migrate
     spec:
+      # Pinned to khaibaai, the control-plane node, on the operator's
+      # instruction. It is also the experiment that narrows the pull failure:
+      # the same digest, same pull secret and same manifest got
+      # `NotFound` on fedora while the credential demonstrably works against
+      # ghcr from outside the cluster. If it pulls here, the fault is
+      # node-local to fedora, most likely a containerd registries.yaml entry
+      # for ghcr.io that overrides imagePullSecrets.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
       restartPolicy: Never
       # Talks only to Postgres. No Kubernetes API calls, so no token is mounted.
       automountServiceAccountToken: false
