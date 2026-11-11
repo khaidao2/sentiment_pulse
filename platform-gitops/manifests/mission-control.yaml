@@ -34,6 +34,12 @@ spec:
         prometheus.io/port: "8000"
         prometheus.io/path: /metrics
     spec:
+      # The API talks to Postgres and S3 and never calls the Kubernetes API, so
+      # it has no use for a service-account token. Mounting one anyway hands any
+      # code running in this pod a cluster identity it does not need, which is
+      # the difference between a compromised web process and a compromised
+      # cluster client. The migration Job already does this.
+      automountServiceAccountToken: false
       # ghcr.io/khaidao2/* answers 401, so the package is private and the node
       # cannot pull without this.
       imagePullSecrets:
