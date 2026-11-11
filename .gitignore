@@ -32,3 +32,12 @@ mutants/
 # part of this repo and must never be swept in by `git add -A`. Remove this
 # line only when the directory itself is gone.
 /code/
+
+# Credential files that kubectl/mc leave in the working tree when a secret is
+# read field by field. They are real keys, this repository is public, and a
+# single `git add -A` would publish them. Ignored so that cannot happen by
+# accident; delete them once whatever needed them is done.
+/access_key
+/secret_key
+/endpoint
+/bucket
