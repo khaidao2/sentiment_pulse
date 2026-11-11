@@ -108,6 +108,13 @@ scheduler:
 apiServer:
   enabled: true
   replicas: 1
+  # Restart when the Keycloak client secret changes. Load bearing: the secret
+  # is a file under /opt/airflow/sso, and webserver_config.py reads it once at
+  # import, so a rotation updates the mounted file and the running process
+  # keeps presenting the old value until it restarts. The chart puts this on
+  # the Deployment's own metadata, which is where Reloader looks.
+  annotations:
+    secret.reloader.stakater.com/reload: airflow-sso-credentials
   waitForMigrations:
     enabled: false
   startupProbe:
