@@ -16,7 +16,11 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'vault-unsealer.yaml'
+      # A glob, so the unseal keys this app's Deployment mounts are served by
+      # the same Application that runs it. Matches vault-unsealer.yaml and
+      # vault-unseal-keys-sealed-secret.yaml, and deliberately not
+      # vault-cluster-secret-store.yaml, which another Application owns.
+      include: 'vault-unseal*.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: vault
