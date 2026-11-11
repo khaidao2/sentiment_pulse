@@ -11,10 +11,17 @@
 #
 # Connection: default https://auth.sentpul.click; set KC_PORT_FORWARD=1 to
 # port-forward svc/keycloak and talk to it locally (no DNS/TLS needed).
+#
+# KUBE CONTEXT. Pinned, not inherited. This helper used to call bare `kubectl`,
+# so it read whatever context happened to be current. On a machine with several
+# clusters that means it looks for keycloak-admin in the wrong one and then
+# reports "no admin credentials", which reads like a missing secret rather than
+# a wrong cluster. Override with KC_KUBE_CONTEXT when the realm lives elsewhere.
 
 set -euo pipefail
 
 KC_URL="${KC_URL:-https://auth.sentpul.click}"
+KC_KUBE_CONTEXT="${KC_KUBE_CONTEXT:-sentpul}"
 KC_NAMESPACE="${KC_NAMESPACE:-keycloak}"
 KC_SERVICE="${KC_SERVICE:-keycloak}"
 REALM_NAME="${REALM_NAME:-data-platform}"
@@ -40,7 +47,7 @@ kc_start_port_forward() {
   [[ "$KC_PORT_FORWARD" == "1" ]] || return 0
   command -v kubectl &>/dev/null || die "KC_PORT_FORWARD=1 needs kubectl."
   info "Port-forwarding svc/${KC_SERVICE} -n ${KC_NAMESPACE} -> localhost:${PF_LOCAL_PORT}"
-  kubectl port-forward -n "$KC_NAMESPACE" "svc/${KC_SERVICE}" "${PF_LOCAL_PORT}:80" &>/dev/null &
+  kubectl --context "$KC_KUBE_CONTEXT" port-forward -n "$KC_NAMESPACE" "svc/${KC_SERVICE}" "${PF_LOCAL_PORT}:80" &>/dev/null &
   PF_PID=$!
   sleep 3
   kill -0 "$PF_PID" 2>/dev/null || die "Port-forward failed to start."
@@ -58,7 +65,7 @@ kc_load_credentials() {
     info "Using admin credentials from environment variables."; return
   fi
   if command -v kubectl &>/dev/null; then
-    KEYCLOAK_ADMIN_PASSWORD="$(kubectl get secret "$KC_ADMIN_SECRET" -n "$KC_NAMESPACE" \
+    KEYCLOAK_ADMIN_PASSWORD="$(kubectl --context "$KC_KUBE_CONTEXT" get secret "$KC_ADMIN_SECRET" -n "$KC_NAMESPACE" \
       -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
     if [[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]; then
       KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
@@ -71,7 +78,7 @@ kc_load_credentials() {
   # password was the well-known default -- so nothing ever surfaced the
   # problem. Failing loudly is the point: a missing secret is a setup error,
   # not something to paper over with a guess.
-  die "No admin credentials. Set KEYCLOAK_ADMIN_USER/KEYCLOAK_ADMIN_PASSWORD, or give this shell kubectl access to secret '$KC_ADMIN_SECRET' in namespace '$KC_NAMESPACE'."
+  die "No admin credentials. Set KEYCLOAK_ADMIN_USER/KEYCLOAK_ADMIN_PASSWORD, or give this shell kubectl access to secret '$KC_ADMIN_SECRET' in namespace '$KC_NAMESPACE' on context '$KC_KUBE_CONTEXT' (override with KC_KUBE_CONTEXT)."
 }
 
 kc_get_token() {
