@@ -14,10 +14,17 @@ reloader:
   # airflow, database and webapp.
   watchGlobally: true
 
-  # Secrets only. Nothing on this platform needs a pod restart because a
-  # ConfigMap changed, and a ConfigMap edit that silently restarts the sinks is
-  # a worse failure than the one this component is here to fix.
-  ignoreConfigMaps: true
+  # Secrets AND ConfigMaps. The original reasoning here was that nothing needed
+  # a restart on a ConfigMap change, and that was wrong. cloudflared reads its
+  # tunnel config at startup, so adding a hostname updated the ConfigMap and
+  # changed nothing until someone restarted the pod by hand. That produced a
+  # real 404 on a brand new hostname on 2026-11-11.
+  #
+  # Watching ConfigMaps is still opt-in per workload by annotation, so this
+  # changes nothing for any Deployment that does not ask for it. The fear behind
+  # the original choice, a ConfigMap edit silently restarting the sinks, needs
+  # those sinks to carry the annotation, and they do not.
+  ignoreConfigMaps: false
   ignoreSecrets: false
 
   deployment:
