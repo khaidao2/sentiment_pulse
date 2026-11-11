@@ -30,6 +30,18 @@ data:
       # 2026-10-29 (firewalld forward reject + stale flannel VXLAN peers).
       - hostname: wepower.sentpul.click
         service: http://sentiment-pulse-web.webapp:80
+      # Mission Control, the agent operations platform. Routed to its
+      # oauth2-proxy and NOT to the application, the same as cloudbeaver above.
+      # The app has its own Keycloak client but does not enforce it yet: its API
+      # answers /api/workspaces with 200 and no credentials, verified against a
+      # running container. A direct route here would publish the agent fleet's
+      # data to the internet.
+      #
+      # This hostname needs a Cloudflare DNS record, unlike wepower.sentpul.click
+      # which reused one. Until the record and the Deployment both exist, this
+      # rule resolves to nothing rather than to something unprotected.
+      - hostname: mission-control.sentpul.click
+        service: http://oauth2-proxy-mission-control.mission-control:80
       - service: http_status:404
 ---
 apiVersion: apps/v1

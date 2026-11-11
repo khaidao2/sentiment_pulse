@@ -1,0 +1,60 @@
+# oauth2-proxy for Mission Control. Gates mission-control.sentpul.click behind
+# Keycloak.
+#
+# Traffic path: cloudflared -> this oauth2-proxy -> mission-control service.
+#
+# WHY A PROXY AT ALL, when scripts/mission_control_keycloak.sh already created an
+# OIDC client for the application itself. Because the application does not
+# enforce it yet. Its API answers /api/workspaces with 200 and no credentials,
+# which I verified against a running container. Putting that on the public
+# internet is a data exposure, and a proxy is the only thing available today
+# that closes it.
+#
+# WHEN THE APPLICATION DOES ITS OWN OIDC, this proxy becomes redundant for
+# authentication but still useful as the edge. At that point the right change is
+# to stop passing identity in headers and let the app read the token, not to
+# delete this and expose the app directly.
+config:
+  # Credentials live in a SealedSecret; see
+  # manifests/oauth2-proxy-mission-control-sealed-secret.yaml, which
+  # scripts/mission_control_keycloak.sh generates alongside the client.
+  existingSecret: oauth2-proxy-mission-control-sealed
+  configFile: |-
+    provider = "oidc"
+    oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"
+    redirect_url = "https://mission-control.sentpul.click/oauth2/callback"
+    upstreams = [
+        "http://mission-control.mission-control.svc.cluster.local:80"
+    ]
+    # The app will read these once it enforces identity itself. Until then they
+    # are what makes the audit trail able to say who did something.
+    set_xauthrequest = true
+    pass_user_headers = true
+    cookie_secure = true
+    # Keycloak users here are created by an admin without SMTP, so the id_token
+    # carries email_verified=false. Accepting it is a deliberate choice for an
+    # internal IdP, matching the cloudbeaver proxy.
+    insecure_oidc_allow_unverified_email = true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+ingress:
+  enabled: false
+
+# An explicit allowlist, not a domain filter. The accounts that reach this share
+# a public provider, so a domain filter would admit the whole internet. The list
+# lives in the in-cluster ConfigMap "oauth2-proxy-allowed-emails" and is
+# deliberately NOT in git, because these are real personal addresses and this
+# repository is public. Create it before the first login:
+#   kubectl -n mission-control create configmap oauth2-proxy-allowed-emails \
+#     --from-literal=restricted_user_access=you@example.com
+authenticatedEmailsFile:
+  enabled: true
+  persistence: configmap
+  template: oauth2-proxy-allowed-emails
