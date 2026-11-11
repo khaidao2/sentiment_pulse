@@ -1,0 +1,154 @@
+# Mission Control, the Agent Operations Platform.
+#
+# Its credentials come from two SealedSecrets that
+# scripts/mission_control_bootstrap.sh creates. It has its OWN database and its
+# own bucket-scoped MinIO identity, not the web app's database and not the MinIO
+# root credential every other client here uses.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mission-control
+  namespace: mission-control
+  labels:
+    app: mission-control
+  annotations:
+    # Wave 1, after the migration Job in wave 0. ArgoCD waits for a wave to be
+    # healthy before the next, so a failed migration leaves this Deployment
+    # UNSYNCED rather than starting pods against a schema that did not apply.
+    argocd.argoproj.io/sync-wave: "1"
+    # Rotating either credential has to restart this pod, because the API reads
+    # both from env at boot. Without this, a rotation serves a credential the
+    # process never reads.
+    secret.reloader.stakater.com/reload: "mission-control-postgres-credentials,mission-control-s3-credentials"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mission-control
+  template:
+    metadata:
+      labels:
+        app: mission-control
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      # The API talks to Postgres and S3 and never calls the Kubernetes API, so
+      # it has no use for a service-account token. Mounting one anyway hands any
+      # code running in this pod a cluster identity it does not need, which is
+      # the difference between a compromised web process and a compromised
+      # cluster client. The migration Job already does this.
+      automountServiceAccountToken: false
+      # ghcr.io/khaidao2/* answers 401, so the package is private and the node
+      # cannot pull without this.
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          # Tag AND digest. The tag says which commit this is for a human
+          # reading the manifest; the digest is what actually gets pulled, so
+          # the same bytes run every time even if the tag moves or is deleted.
+          # Never `latest`: it makes "which commit is serving" unanswerable,
+          # which is the failure the web app's build workflow was created to end.
+          #
+          # MUST stay identical to the migration Job's image. One artifact
+          # serves both, so a mismatch between them is impossible by
+          # construction only as long as both lines agree.
+          image: ghcr.io/khaidao2/mission-control:sha-5a784c2@sha256:8d3e3f3c17969a2dfd91cdeb5fe0eec35d960cd0fb73dfdbb2a30e49df488708
+          # IfNotPresent, not Always: a digest already names exact bytes, so
+          # re-pulling them on every restart buys nothing and costs a round trip
+          # to a registry that may be unreachable when a node reboots.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-postgres-credentials
+                  key: dsn
+            - name: S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: endpoint
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: bucket
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: access_key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-s3-credentials
+                  key: secret_key
+            # MinIO ignores the region, but boto3 refuses to sign a request
+            # without one, so this is a literal rather than a secret.
+            - name: S3_REGION
+              value: us-east-1
+          readinessProbe:
+            # /readyz checks the database, so this gates traffic on the thing
+            # that actually has to work.
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            # /healthz touches no database on purpose. A database blip must not
+            # restart a process that is otherwise fine.
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # LOAD-BEARING. The S3 adapter spools an upload through a
+            # SpooledTemporaryFile so it can hash the bytes and do a multipart
+            # upload without holding the object in memory. With a read-only root
+            # filesystem and no writable tmp, every upload above the spool
+            # threshold fails at the point it touches disk.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mission-control
+  namespace: mission-control
+spec:
+  type: ClusterIP
+  selector:
+    app: mission-control
+  ports:
+    - port: 80
+      targetPort: http
+      name: http

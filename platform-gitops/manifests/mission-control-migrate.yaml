@@ -1,0 +1,104 @@
+# Apply Mission Control's schema before the new version starts.
+#
+# ORDERING: this Job is sync-wave "0" and the Deployment is "1". ArgoCD finishes
+# a wave and waits for it to be healthy before starting the next, so a failed
+# migration leaves the Deployment UNSYNCED and whatever was serving keeps
+# serving. A broken migration must not be able to start new pods.
+#
+# Why a wave and not a PreSync hook, which is the semantically exact tool: this
+# cluster's ArgoCD demonstrably does not run hook Jobs. The reasoning is
+# recorded in full in sentiment-pulse-web-migrate.yaml, which hit it first with
+# the bitnami kafka chart. Sync waves are proven to work here. This file follows
+# that decision rather than re-testing it.
+#
+# Force=true,Replace=true because a Job's spec is immutable: when the image
+# moves, patching the pod template is rejected, and Replace alone makes ArgoCD
+# run `kubectl replace`, which demands the auto-generated spec.selector and
+# controller-uid labels no hand-written manifest carries. Force makes ArgoCD
+# delete and recreate instead. It also means the Job re-runs on a resync,
+# including a selfHeal drift sync. That is safe here for two reasons beyond
+# dbmate's: migrate.py skips filenames already in schema_migrations, and it
+# holds a Postgres advisory lock for the whole run so two runners serialise
+# instead of racing.
+#
+# ONE IMAGE, not two. The web app builds a separate migrate image; this product
+# builds one image that serves the API by default and runs migrations when given
+# a different command. Fewer builds, and the migration code and the application
+# code cannot drift apart because they are the same artifact.
+#
+# DIFFERENT FROM THE WEB APP ON PURPOSE: that Job composes DATABASE_URL from
+# separate secret keys so no full connection string exists as a stored value.
+# Mission Control's credential is sealed as a single `dsn` key, because the
+# application reads one value and assembling it in two places is how the two
+# drift. The tradeoff is that the stored value contains the password. migrate.py
+# redacts it before logging, which is a real risk here: this Job's stdout is
+# readable with `kubectl logs` and it runs as the database owner.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mission-control-migrate
+  namespace: mission-control
+  labels:
+    app: mission-control
+    component: migrate
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  # One attempt, then fail the wave. A migration that fails twice fails for a
+  # reason, and retrying it silently delays the signal.
+  backoffLimit: 0
+  # Keep the finished pod so `kubectl logs job/mission-control-migrate` is an
+  # audit trail of what was applied and when.
+  ttlSecondsAfterFinished: 604800   # 7 days
+  template:
+    metadata:
+      labels:
+        app: mission-control
+        component: migrate
+    spec:
+      restartPolicy: Never
+      # Talks only to Postgres. No Kubernetes API calls, so no token is mounted.
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          # Tag AND digest. The tag says which commit this is for a human
+          # reading the manifest; the digest is what actually gets pulled, so
+          # the same bytes run every time even if the tag is moved or deleted.
+          # MUST stay identical to the Deployment's image: they are one
+          # artifact, and a mismatch is the drift this Job exists to prevent.
+          image: ghcr.io/khaidao2/mission-control:sha-5a784c2@sha256:8d3e3f3c17969a2dfd91cdeb5fe0eec35d960cd0fb73dfdbb2a30e49df488708
+          # IfNotPresent, not Always: a digest already names exact bytes, so
+          # re-pulling them buys nothing.
+          imagePullPolicy: IfNotPresent
+          command: ["python", "backend/db/migrate.py"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mission-control-postgres-credentials
+                  key: dsn
+            # The source tree is read-only, so Python cannot cache bytecode
+            # there. Saying so keeps the warning out of the migration log.
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
