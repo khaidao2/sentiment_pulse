@@ -50,8 +50,20 @@ spec:
             - containerPort: 9001
               name: console
           # Root credentials come from a SealedSecret. They were literals here, in a
-          # public repo. The sinks and transform DAGs read the separate
-          # `minio-credentials` secret, which must be rotated in step with this one.
+          # public repo.
+          #
+          # MinIO has no users and no service accounts, so root is the ONLY
+          # identity and every consumer holds a copy of this credential:
+          #   - minio-credentials (ns database + ns airflow) -- the 5 sinks and
+          #     the transform DAGs; rotate_platform_secrets.sh step 5 patches it.
+          #   - airflow-s3-credentials (ns airflow) -- the Airflow connection URI
+          #     behind AIRFLOW_CONN_AWS_DEFAULT, which remote task logging uses.
+          #     The 2026-11-07 rotation missed it and four days of task logs went
+          #     nowhere while everything reported healthy.
+          # Rotating root without ALL of them breaks them silently, so run
+          # scripts/reseal_minio_consumers.sh afterwards: it derives every
+          # consumer from the live value of this secret and proves each one
+          # authenticates before it writes a manifest.
           envFrom:
             - secretRef:
                 name: minio-root-sealed
