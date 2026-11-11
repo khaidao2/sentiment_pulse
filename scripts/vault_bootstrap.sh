@@ -29,7 +29,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 MF=platform-gitops/manifests
 OUT="$MF/vault-unseal-keys-sealed-secret.yaml"
-INV=platform-gitops/secrets-inventory.tsv
+CREDS=platform-gitops/credentials
 NS=vault
 # A sealed Vault fails its readiness probe, so the `vault` Service has no
 # endpoints and only the headless one resolves the pod. Talking to the Service
@@ -188,8 +188,8 @@ printf '%sThen:%s\n' "$C_Y" "$C_0"
 echo "  1. Put them in your password manager. The sealed copy in git covers a"
 echo "     reboot, not the loss of the sealed-secrets controller key."
 echo "  2. Commit $OUT."
-echo "  3. Add this row to $INV, because the gate fails on a credential with no row:"
-printf '       vault\tvault-unseal-keys\tpersistent\tsealed\t\n'
+echo "  3. Declare it, because the gate fails on a credential with no file:"
+echo "       $CREDS/vault.vault-unseal-keys.yaml"
 echo "  4. Revoke the root token once you have stored it:"
 echo "       kubectl --context sentpul -n $NS exec -i vault-0 -- env VAULT_ADDR=$POD_ADDR VAULT_TOKEN=<root> vault token revoke -self"
 echo "     Vault's own docs call a long-lived root token the thing to avoid, and"

@@ -110,7 +110,7 @@ ok "Mission Control Keycloak setup complete."
 # value, so the script is what should seal it.
 MC_NS="${MISSION_CONTROL_NAMESPACE:-mission-control}"
 MC_OUT="platform-gitops/manifests/mission-control-oidc-sealed-secret.yaml"
-MC_INV="platform-gitops/secrets-inventory.tsv"
+MC_CREDS="platform-gitops/credentials"
 
 if ! command -v kubeseal >/dev/null; then
   warn "kubeseal is not installed, so the client secret could not be sealed."
@@ -152,12 +152,18 @@ kubectl --context "$KC_KUBE_CONTEXT" -n "$MC_NS" get secret mission-control-oidc
   || die "mission-control-oidc never materialised, so do NOT commit $MC_OUT"
 ok "sealed, applied and materialised: $MC_NS/mission-control-oidc -> $MC_OUT"
 
-# The gate fails on a credential with no declared store, so declare it here
-# rather than leaving a step for a person to forget.
-if [ -f "$MC_INV" ] && ! grep -q "^${MC_NS}	mission-control-oidc	" "$MC_INV"; then
-  printf '%s\tmission-control-oidc\tpersistent\tsealed\t\n' "$MC_NS" >> "$MC_INV"
-  ok "declared $MC_NS/mission-control-oidc in $MC_INV"
+# The gate fails on a credential with no declaration, so declare it here rather
+# than leaving a step for a person to forget. One file per credential, named for
+# the credential it declares, which is what the gate checks.
+MC_DECL="$MC_CREDS/${MC_NS}.mission-control-oidc.yaml"
+if [ -d "$MC_CREDS" ] && [ ! -f "$MC_DECL" ]; then
+  { echo "namespace: $MC_NS"
+    echo "name: mission-control-oidc"
+    echo "class: persistent"
+    echo "store: sealed"
+    echo 'reason: ""'; } > "$MC_DECL"
+  ok "declared $MC_NS/mission-control-oidc in $MC_DECL"
 fi
-warn "Commit $MC_OUT and the inventory row, or ArgoCD selfHeal reverts this."
+warn "Commit $MC_OUT and $MC_DECL, or ArgoCD selfHeal reverts this."
 info "Assign mission-control-admin to yourself before the first login, or the"
 info "deployed app will authenticate you with no permissions at all."

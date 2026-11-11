@@ -1,6 +1,6 @@
 # Vault holds the credentials that ROTATE. Persistent credentials stay in
-# SealedSecrets, which platform-gitops/secrets-inventory.tsv records per
-# credential.
+# SealedSecrets. platform-gitops/credentials/ declares every credential, one
+# file per credential, and names the store that owns it.
 #
 # MinIO and ClickHouse have no Vault secrets engine, so for those Vault is a KV
 # store with a rotation script in front of it. PostgreSQL is the one place a
