@@ -1,0 +1,31 @@
+# Reloader exists for one specific gap. Vault's database engine issues a new
+# PostgreSQL credential per lease and ESO writes it into the Secret, but the web
+# app and the Airflow components read their DSN from env at pod start. A
+# refreshed Secret does not restart them, so without this a rotation would
+# serve a credential the pods never read, and the symptom would be
+# authentication failures at the next unrelated restart.
+#
+# It acts only on workloads that ask for it by annotation, so deploying it
+# changes nothing until a Deployment carries
+# secret.reloader.stakater.com/reload: <secret name>.
+
+reloader:
+  # Watches every namespace, because the credentials it has to react to live in
+  # airflow, database and webapp.
+  watchGlobally: true
+
+  # Secrets only. Nothing on this platform needs a pod restart because a
+  # ConfigMap changed, and a ConfigMap edit that silently restarts the sinks is
+  # a worse failure than the one this component is here to fix.
+  ignoreConfigMaps: true
+  ignoreSecrets: false
+
+  deployment:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
