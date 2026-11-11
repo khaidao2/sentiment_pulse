@@ -92,7 +92,7 @@ spec:
           # the same bytes run every time even if the tag is moved or deleted.
           # MUST stay identical to the Deployment's image: they are one
           # artifact, and a mismatch is the drift this Job exists to prevent.
-          image: ghcr.io/khaidao2/mission-control:sha-d7b9add@sha256:2c6a25672664510aa785ce2e80a5fd6dc38b46edf1d5a0fa0282185fb9e9a948
+          image: ghcr.io/khaidao2/mission-control:sha-7b00979@sha256:77b28f9fe8da385973ff394495c3ca7293440907a02fa961342829568ca30dd9
           # IfNotPresent, not Always: a digest already names exact bytes, so
           # re-pulling them buys nothing.
           imagePullPolicy: IfNotPresent
