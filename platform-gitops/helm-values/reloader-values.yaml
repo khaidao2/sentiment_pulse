@@ -29,6 +29,15 @@ reloader:
 
   deployment:
     replicas: 1
+    pod:
+      annotations:
+        # Port 9090 read off the running Deployment's container port, not
+        # guessed. Without these, Prometheus has zero reloader metrics, so a
+        # Reloader that stopped restarting workloads on a rotation would look
+        # exactly like a Reloader with nothing to do.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
     resources:
       requests:
         cpu: 10m
