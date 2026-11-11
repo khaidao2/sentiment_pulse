@@ -12,7 +12,10 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'kafka-ui.yaml'
+      # Glob, not one filename, so kafka-ui-oauth-sealed-secret.yaml is served
+      # too. api_crawler/tests/test_dag_secrets.py fails on a SealedSecret
+      # manifest that no Application syncs.
+      include: 'kafka-ui*.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: kafka

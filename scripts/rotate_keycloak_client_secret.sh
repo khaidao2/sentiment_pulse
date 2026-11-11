@@ -32,7 +32,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-CLIENT= NS= SECRET= KEY= MANIFEST= REALM=data-platform
+CLIENT= NS= SECRET= KEY= MANIFEST= REALM=data-platform CREATE=0
 KC_URL="${KC_URL:-https://auth.sentpul.click}"
 CTX="${KC_KUBE_CONTEXT:-sentpul}"
 
@@ -44,6 +44,10 @@ while [ $# -gt 0 ]; do
     --key) KEY="$2"; shift 2;;
     --manifest) MANIFEST="$2"; shift 2;;
     --realm) REALM="$2"; shift 2;;
+    # First time a client's secret is sealed, when there is no manifest to
+    # overwrite yet. kafka-ui needed this: its secret was a literal in a
+    # Deployment, so there was nothing to rotate, only something to replace.
+    --create) CREATE=1; shift;;
     -h|--help) sed -n '2,30p' "$0"; exit 0;;
     *) echo "unknown argument: $1" >&2; exit 2;;
   esac
@@ -67,7 +71,11 @@ if [ -z "$MANIFEST" ]; then
     *)        MANIFEST="platform-gitops/manifests/${SECRET}-sealed-secret.yaml";;
   esac
 fi
-[ -f "$MANIFEST" ] || die "$MANIFEST does not exist, so this is a new credential rather than a rotation"
+if [ "$CREATE" = 1 ]; then
+  [ -f "$MANIFEST" ] && die "$MANIFEST already exists, so drop --create and rotate it"
+else
+  [ -f "$MANIFEST" ] || die "$MANIFEST does not exist. Pass --create if this credential has never been sealed"
+fi
 
 for t in kubectl kubeseal curl python3; do command -v $t >/dev/null || die "missing tool: $t"; done
 k(){ kubectl --context "$CTX" "$@"; }
@@ -113,6 +121,7 @@ ok "Keycloak stores exactly what will be sealed"
 # holding more than this one credential does not lose the rest.
 args=( --from-file="$KEY=$d/new" )
 carried=0
+# With --create there is no live Secret yet, so this loop finds nothing.
 for existing in $(k -n "$NS" get secret "$SECRET" -o go-template='{{range $k,$v := .data}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null); do
   [ "$existing" = "$KEY" ] && continue
   k -n "$NS" get secret "$SECRET" -o go-template="{{index .data \"$existing\" | base64decode}}" > "$d/carry-$existing"

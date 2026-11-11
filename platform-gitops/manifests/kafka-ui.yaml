@@ -3,6 +3,12 @@ kind: Deployment
 metadata:
   name: kafka-ui
   namespace: kafka
+  annotations:
+    # Restart when the OIDC secret changes. Load bearing: the secret below is
+    # an env var, read once at process start, so a rotation would update the
+    # Secret and leave kafka-ui presenting a dead credential to Keycloak until
+    # someone restarted it by hand.
+    secret.reloader.stakater.com/reload: kafka-ui-oauth-sealed
 spec:
   replicas: 1
   selector:
@@ -34,8 +40,15 @@ spec:
               value: OAUTH2
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_ID
               value: kafka-ui
+            # Was a literal in this file, in a PUBLIC repository, and Keycloak was
+            # still accepting it. Rotated 2026-11-11 and moved here. A Secret is not
+            # encrypted, only base64, so this buys RBAC rather than secrecy; the
+            # thing it really buys is that git no longer carries the value.
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_SECRET
-              value: "736d99c12362911eeb9837cc08dcc7d83fa2af3c20485851"
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-ui-oauth-sealed
+                  key: AUTH_OAUTH2_CLIENT_KEYCLOAK_CLIENT_SECRET
             - name: AUTH_OAUTH2_CLIENT_KEYCLOAK_SCOPE
               value: openid,profile,email
             # Hardcoded — kafka-ui computes this dynamically from the
