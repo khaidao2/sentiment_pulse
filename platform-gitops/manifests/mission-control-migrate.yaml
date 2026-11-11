@@ -33,6 +33,13 @@
 # drift. The tradeoff is that the stored value contains the password. migrate.py
 # redacts it before logging, which is a real risk here: this Job's stdout is
 # readable with `kubectl logs` and it runs as the database owner.
+#
+# THAT RISK LANDED, on this Job's first real run. The image pinned then was
+# built one commit before migrate.py learned to redact, so it printed the whole
+# connection string. The password was rotated, this Job and its log were
+# deleted, and the pin below is the build that redacts. The lesson lives in the
+# pin itself: an image whose tag predates a fix does not contain the fix, and a
+# digest makes that checkable instead of assumable.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -58,12 +65,13 @@ spec:
         component: migrate
     spec:
       # Pinned to khaibaai, the control-plane node, on the operator's
-      # instruction. It is also the experiment that narrows the pull failure:
-      # the same digest, same pull secret and same manifest got
-      # `NotFound` on fedora while the credential demonstrably works against
-      # ghcr from outside the cluster. If it pulls here, the fault is
-      # node-local to fedora, most likely a containerd registries.yaml entry
-      # for ghcr.io that overrides imagePullSecrets.
+      # instruction. It was also the experiment that narrowed the pull failure,
+      # and the experiment answered: the same digest, same pull secret and same
+      # manifest got `NotFound` on fedora, then pulled and completed here in 20
+      # seconds. The fault is node-local to fedora, not a bad credential. The
+      # leading suspect is a containerd registries.yaml entry for ghcr.io that
+      # overrides imagePullSecrets, which is unproven and tracked separately.
+      # Until it is fixed, this selector is what keeps the Job runnable.
       nodeSelector:
         kubernetes.io/hostname: khaibaai
       restartPolicy: Never
@@ -84,7 +92,7 @@ spec:
           # the same bytes run every time even if the tag is moved or deleted.
           # MUST stay identical to the Deployment's image: they are one
           # artifact, and a mismatch is the drift this Job exists to prevent.
-          image: ghcr.io/khaidao2/mission-control:sha-5a784c2@sha256:8d3e3f3c17969a2dfd91cdeb5fe0eec35d960cd0fb73dfdbb2a30e49df488708
+          image: ghcr.io/khaidao2/mission-control:sha-a59dbd6@sha256:2f635fe82eb5521ab205ce048d47e1bbe93237e58574f797cfba87efb5eed32a
           # IfNotPresent, not Always: a digest already names exact bytes, so
           # re-pulling them buys nothing.
           imagePullPolicy: IfNotPresent

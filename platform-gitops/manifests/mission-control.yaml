@@ -35,12 +35,13 @@ spec:
         prometheus.io/path: /metrics
     spec:
       # Pinned to khaibaai, the control-plane node, on the operator's
-      # instruction. It is also the experiment that narrows the pull failure:
-      # the same digest, same pull secret and same manifest got
-      # `NotFound` on fedora while the credential demonstrably works against
-      # ghcr from outside the cluster. If it pulls here, the fault is
-      # node-local to fedora, most likely a containerd registries.yaml entry
-      # for ghcr.io that overrides imagePullSecrets.
+      # instruction, and kept there because fedora cannot pull this image. The
+      # same digest, same pull secret and same manifest got `NotFound` on
+      # fedora and pulled here in 20 seconds, so the fault is node-local to
+      # fedora rather than a bad credential. The leading suspect is a
+      # containerd registries.yaml entry for ghcr.io that overrides
+      # imagePullSecrets; that is unproven. Removing this selector before the
+      # fedora fault is fixed costs the deployment one of its two nodes.
       nodeSelector:
         kubernetes.io/hostname: khaibaai
       # The API talks to Postgres and S3 and never calls the Kubernetes API, so
@@ -68,7 +69,7 @@ spec:
           # MUST stay identical to the migration Job's image. One artifact
           # serves both, so a mismatch between them is impossible by
           # construction only as long as both lines agree.
-          image: ghcr.io/khaidao2/mission-control:sha-5a784c2@sha256:8d3e3f3c17969a2dfd91cdeb5fe0eec35d960cd0fb73dfdbb2a30e49df488708
+          image: ghcr.io/khaidao2/mission-control:sha-a59dbd6@sha256:2f635fe82eb5521ab205ce048d47e1bbe93237e58574f797cfba87efb5eed32a
           # IfNotPresent, not Always: a digest already names exact bytes, so
           # re-pulling them on every restart buys nothing and costs a round trip
           # to a registry that may be unreachable when a node reboots.
