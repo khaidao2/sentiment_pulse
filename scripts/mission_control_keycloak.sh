@@ -161,7 +161,12 @@ ok "sealed, applied and materialised: $MC_NS/mission-control-oidc -> $MC_OUT"
 # cookie secret of its own. It is sealed here because this script is what knows
 # the client secret, and a credential a person has to carry between two
 # terminals is the problem this script was already fixed once to avoid.
-MC_PROXY_OUT="platform-gitops/manifests/oauth2-proxy-mission-control-sealed-secret.yaml"
+# Named mission-control-* so the mission-control Application's existing
+# include glob serves it. A manifest no Application includes is a file, not a
+# secret: it exists in the cluster only because a script applied it once, and
+# nothing then keeps git and the cluster honest. api_crawler's
+# test_dag_secrets.py fails on exactly that, and it caught this file.
+MC_PROXY_OUT="platform-gitops/manifests/mission-control-oauth2-proxy-sealed-secret.yaml"
 printf %s "mission-control" > "$_d/client-id"
 cp "$_d/client_secret" "$_d/client-secret"
 # oauth2-proxy requires a 16, 24 or 32 byte cookie secret, base64url encoded.
