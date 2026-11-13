@@ -293,6 +293,15 @@ config:
   core:
     load_examples: "False"
     auth_manager: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  scheduler:
+    # DagProcessorJob aliveness is heartrate * 2.1, and for every job type other
+    # than SchedulerJob/TriggererJob the heartrate is [scheduler] job_heartbeat_sec.
+    # At the 5s default that is a 10.5s deadline, while measured heartbeat age
+    # already reaches ~10.4s under normal parsing -- so the dag-processor
+    # livenessProbe (`airflow jobs check --local --job-type DagProcessorJob`)
+    # intermittently reported "No alive jobs found" with no real fault.
+    # 15s moves the deadline to 31.5s, a ~3x margin over observed heartbeat gaps.
+    job_heartbeat_sec: "15"
   webserver:
     expose_config: "True"
   logging:
@@ -308,6 +317,18 @@ migrateDatabaseJob:
   enabled: true
   useHelmHooks: false
   applyCustomEnv: false
+  # Let ArgoCD own this Job as a Sync hook rather than a tracked resource.
+  # With useHelmHooks=false the chart emits no hook annotations, so the Job was
+  # a normal tracked resource. ttlSecondsAfterFinished (300s, chart default)
+  # then deleted the completed Job, ArgoCD saw it missing from live state, and
+  # syncPolicy.selfHeal recreated it -- an endless loop that reran
+  # `airflow db migrate` every ~5 minutes forever.
+  # Hook resources are excluded from drift detection, which breaks the loop;
+  # BeforeHookCreation also avoids the Job-spec immutability problem on a real
+  # chart/image upgrade.
+  jobAnnotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
   resources:
     requests:
       cpu: 100m
