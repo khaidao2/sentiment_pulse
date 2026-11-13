@@ -44,6 +44,17 @@ extraEnv: |
 # ── Secrets from Vault + VSO ──────────────────────────────────────────────────
 fernetKeySecretName: airflow-fernet-key
 webserverSecretKeySecretName: airflow-webserver-secret
+# Point at the adopted SealedSecrets instead of letting the chart mint these.
+# Unpinned, the chart generates both with randAlphaNum on EVERY render, so each
+# new repo revision -- including commits that have nothing to do with airflow,
+# like a mission-control image bump -- produced a different jwt-secret, changed
+# checksum/jwt-secret on the api-server and scheduler pod templates, and rolled
+# both. Eleven api-server ReplicaSets in 33h, eleven distinct jwt checksums,
+# while checksum/airflow-config never moved. It also invalidated every live API
+# token each time. Pinning makes the render deterministic and drops the
+# checksum annotation entirely.
+jwtSecretName: airflow-jwt-secret
+apiSecretKeySecretName: airflow-api-secret-key
 
 # ── Webserver (pod disabled in Airflow 3.x — but webserverConfig still creates
 #    the ConfigMap that apiServer mounts for FabAuthManager/OAuth) ─────────────

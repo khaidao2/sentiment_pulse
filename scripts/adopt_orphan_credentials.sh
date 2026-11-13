@@ -48,8 +48,10 @@ d="$(mktemp -d)"; trap 'rm -rf "$d"' EXIT; umask 077
 # Listed explicitly rather than discovered, so adding one is a visible edit and
 # a surprise in the cluster cannot silently pull a new secret into git.
 TARGETS="
+airflow/airflow-api-secret-key
 airflow/airflow-fernet-key
 airflow/airflow-git-credentials
+airflow/airflow-jwt-secret
 airflow/airflow-sso-credentials
 airflow/airflow-webserver-secret
 kube-system/cloudflared-creds
