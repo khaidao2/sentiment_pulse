@@ -89,6 +89,9 @@ adopt(){ # <namespace> <name>
     # SealedSecret the controller rejected as invalid JSON.
     k -n "$ns" get secret "$name" \
       -o go-template="{{index .data \"$key\" | base64decode}}" > "$d/$key"
+    # The before/after hash below matches when both sides are empty, so it cannot
+    # catch this. An empty cloudflared-creds was sealed that way (KAN-35).
+    [ -s "$d/$key" ] || die "$ns/$name key $key is empty, refusing to seal"
     printf '%s %s\n' "$key" "$(sha256sum < "$d/$key" | cut -d' ' -f1)" >> "$d/before.sha"
     args+=( --from-file="$key=$d/$key" )
   done <<< "$keys"
