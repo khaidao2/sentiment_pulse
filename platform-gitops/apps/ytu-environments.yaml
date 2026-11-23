@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ytu-staging-environment
+  name: ytu-environments
   namespace: argocd
   annotations:
     # After the namespaces application (wave -1).
@@ -15,10 +15,10 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'ytu-staging-environment.yaml'
+      include: 'ytu-environments.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: ytu-staging
+    namespace: ytu
   syncPolicy:
     automated:
       prune: true

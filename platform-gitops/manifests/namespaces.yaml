@@ -75,3 +75,11 @@ metadata:
   labels:
     app.kubernetes.io/part-of: ytu-ops
     environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ytu
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+    environment: prod
