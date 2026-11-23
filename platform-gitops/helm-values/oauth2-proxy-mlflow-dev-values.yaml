@@ -1,0 +1,35 @@
+# Gates mlflow-dev.sentpul.click behind Keycloak.
+# Traffic path: cloudflared -> this oauth2-proxy -> MLflow.
+config:
+  existingSecret: oauth2-proxy-mlflow-dev-sealed
+  configFile: |-
+    provider = "oidc"
+    oidc_issuer_url = "https://auth.sentpul.click/realms/data-platform"
+    redirect_url = "https://mlflow-dev.sentpul.click/oauth2/callback"
+    upstreams = [
+        "http://mlflow.mlops-dev.svc.cluster.local:5000"
+    ]
+    set_xauthrequest = true
+    pass_user_headers = true
+    cookie_secure = true
+    # scripts/mlflow_dev_keycloak.sh requires PKCE on this client.
+    code_challenge_method = "S256"
+    # Internal Keycloak users are created without SMTP verification.
+    insecure_oidc_allow_unverified_email = true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+ingress:
+  enabled: false
+
+# The allowlist lives only in the cluster because this repository is public.
+authenticatedEmailsFile:
+  enabled: true
+  persistence: configmap
+  template: oauth2-proxy-allowed-emails
