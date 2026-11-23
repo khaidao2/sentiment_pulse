@@ -15,7 +15,7 @@ spec:
     targetRevision: HEAD
     path: platform-gitops/manifests
     directory:
-      include: 'mlflow-dev.yaml'
+      include: 'mlflow-dev*.yaml'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: mlops-dev

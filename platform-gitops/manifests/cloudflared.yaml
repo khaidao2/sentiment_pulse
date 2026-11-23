@@ -42,6 +42,9 @@ data:
       # rule resolves to nothing rather than to something unprotected.
       - hostname: mission-control.sentpul.click
         service: http://oauth2-proxy-mission-control.mission-control:80
+      # MLflow has no login, so this routes to its oauth2-proxy and never to MLflow.
+      - hostname: mlflow-dev.sentpul.click
+        service: http://oauth2-proxy-mlflow-dev.mlops-dev:80
       - service: http_status:404
 ---
 apiVersion: apps/v1

@@ -2,7 +2,8 @@
 #
 # SQLite and artifacts share one volume, so dev holds no platform credential.
 # The shared MinIO has only a root identity, which dev must never receive. The
-# server has no login, so the namespace's network policy is its access boundary.
+# server has no login: inside the cluster the namespace's network policy is its
+# boundary, and the public hostname reaches it only through oauth2-proxy.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -55,7 +56,8 @@ spec:
             - --backend-store-uri=sqlite:////mlflow/mlflow.db
             - --artifacts-destination=/mlflow/artifacts
             - --serve-artifacts
-            - --allowed-hosts=mlflow.mlops-dev.svc.cluster.local:5000,mlflow.mlops-dev.svc:5000,mlflow:5000,localhost:5000
+            - --allowed-hosts=mlflow.mlops-dev.svc.cluster.local:5000,mlflow.mlops-dev.svc:5000,mlflow:5000,localhost:5000,mlflow-dev.sentpul.click
+            - --cors-allowed-origins=https://mlflow-dev.sentpul.click
           env:
             - name: HOME
               value: /tmp
@@ -118,3 +120,27 @@ spec:
     - name: http
       port: 5000
       targetPort: http
+---
+# The only path in from the public tunnel, and only to the login proxy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-to-oauth2-proxy
+  namespace: mlops-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+      app.kubernetes.io/instance: oauth2-proxy-mlflow-dev
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app: cloudflared
+      ports:
+        - protocol: TCP
+          port: 4180
