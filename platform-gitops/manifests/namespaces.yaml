@@ -47,4 +47,23 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: mlops-dev
+  labels:
+    app.kubernetes.io/part-of: credit-mlops
+    environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-staging
+  labels:
+    app.kubernetes.io/part-of: credit-mlops
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: mlops
+  labels:
+    app.kubernetes.io/part-of: credit-mlops
+    environment: prod
