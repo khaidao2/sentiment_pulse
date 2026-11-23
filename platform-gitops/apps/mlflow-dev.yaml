@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow-dev
+  namespace: argocd
+  annotations:
+    # After mlops-environments (wave 0), which sets this namespace's guardrails.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'mlflow-dev.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: mlops-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
