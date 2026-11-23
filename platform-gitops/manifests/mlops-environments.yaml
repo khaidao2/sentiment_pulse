@@ -12,10 +12,10 @@ metadata:
   namespace: mlops-dev
 spec:
   hard:
-    requests.cpu: "1"
-    requests.memory: 2Gi
-    limits.cpu: "2"
-    limits.memory: 4Gi
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "6"
+    limits.memory: 8Gi
     pods: "10"
     persistentvolumeclaims: "2"
     requests.storage: 20Gi
