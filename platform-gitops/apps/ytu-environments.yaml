@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ytu-environments
+  namespace: argocd
+  annotations:
+    # After the namespaces application (wave -1).
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'ytu-environments.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: ytu
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
