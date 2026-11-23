@@ -67,3 +67,11 @@ metadata:
   labels:
     app.kubernetes.io/part-of: credit-mlops
     environment: prod
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+    environment: staging
