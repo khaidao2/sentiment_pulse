@@ -1,0 +1,23 @@
+# The workload is defined in credit-mlops. This repository only points ArgoCD at it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: credit-api-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'git@github.com:khaidao2/credit-mlops.git'
+    targetRevision: main
+    path: deploy/overlays/dev
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: mlops-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
