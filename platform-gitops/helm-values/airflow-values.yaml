@@ -30,6 +30,12 @@ extraEnv: |
       secretKeyRef:
         name: airflow-git-credentials
         key: connectionUri
+  # Read-only deploy key and pinned GitHub host key for the credit-mlops DAG bundle.
+  - name: AIRFLOW_CONN_CREDIT_MLOPS_GIT
+    valueFrom:
+      secretKeyRef:
+        name: credit-mlops-git-connection
+        key: connection
   - name: AIRFLOW__SECRETS__BACKEND
     value: "airflow.providers.cncf.kubernetes.secrets.kubernetes_secrets_backend.KubernetesSecretsBackend"
   - name: AIRFLOW__KUBERNETES_SECRETS_BACKEND__CONNECTIONS_PREFIX
@@ -313,6 +319,9 @@ config:
     # intermittently reported "No alive jobs found" with no real fault.
     # 15s moves the deadline to 31.5s, a ~3x margin over observed heartbeat gaps.
     job_heartbeat_sec: "15"
+  dag_processor:
+    # dags-folder is the existing git-sync path. credit-mlops owns its own DAGs.
+    dag_bundle_config_list: '[{"name":"dags-folder","classpath":"airflow.dag_processing.bundles.local.LocalDagBundle","kwargs":{}},{"name":"credit-mlops","classpath":"airflow.providers.git.bundles.git.GitDagBundle","kwargs":{"git_conn_id":"credit_mlops_git","tracking_ref":"main","subdir":"dags","refresh_interval":60}}]'
   webserver:
     expose_config: "True"
   logging:
