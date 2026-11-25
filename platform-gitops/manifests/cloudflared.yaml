@@ -45,6 +45,11 @@ data:
       # MLflow has no login, so this routes to its oauth2-proxy and never to MLflow.
       - hostname: mlflow-dev.sentpul.click
         service: http://oauth2-proxy-mlflow-dev.mlops-dev:80
+      # YTU Ops staging. Routed to the oauth2-proxy sidecar in the agent pod
+      # (Service gateway), never to the agent or web directly. Needs a Cloudflare
+      # DNS record; until it exists this rule resolves to nothing.
+      - hostname: ytu-staging.sentpul.click
+        service: http://gateway.ytu-staging:80
       - service: http_status:404
 ---
 apiVersion: apps/v1
