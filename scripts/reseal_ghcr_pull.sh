@@ -23,6 +23,8 @@
 #   scripts/reseal_ghcr_pull.sh --token-file ~/path/to/token
 #   printf '%s' "$TOKEN" | scripts/reseal_ghcr_pull.sh
 #   scripts/reseal_ghcr_pull.sh --namespace webapp --token-file ...
+#   scripts/reseal_ghcr_pull.sh --namespace ytu-staging --new \
+#       --package khaidao2/ytu-ops-agent --manifest platform-gitops/manifests/ytu-staging.yaml --token-file ...
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -31,12 +33,16 @@ NS=mission-control
 TOKEN_FILE=
 GH_USER=khaidao2
 PACKAGE=khaidao2/mission-control
+MANIFEST=platform-gitops/manifests/mission-control.yaml
+NEW=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --namespace) NS="$2"; shift 2;;
     --token-file) TOKEN_FILE="$2"; shift 2;;
     --package) PACKAGE="$2"; shift 2;;
+    --manifest) MANIFEST="$2"; shift 2;;
+    --new) NEW=1; shift;;
     -h|--help) sed -n '2,30p' "$0"; exit 0;;
     *) echo "unknown argument: $1" >&2; exit 2;;
   esac
@@ -95,8 +101,8 @@ else
 fi
 
 # Prove it can pull the digest the manifests pin, not just that it authenticates.
-pinned="$(grep -hoP '(?<=image: )ghcr\.io/\S+' platform-gitops/manifests/mission-control.yaml | head -1)"
-[ -n "$pinned" ] || die "could not find the pinned image in platform-gitops/manifests/mission-control.yaml"
+pinned="$(grep -hoP "(?<=image: )ghcr\\.io/${PACKAGE}:\\S+" "$MANIFEST" | head -1)"
+[ -n "$pinned" ] || die "could not find a pinned ${PACKAGE} image in $MANIFEST"
 ref="${pinned#*@}"
 ok "manifests pin $ref"
 
@@ -123,7 +129,11 @@ json.dump({"auths": {"ghcr.io": {"username": user, "password": tok, "auth": auth
 PY
 
 out="platform-gitops/manifests/${NS}-ghcr-pull-sealed-secret.yaml"
-[ -f "$out" ] || die "$out does not exist, so this is a new credential rather than a rotation"
+if [ "$NEW" = 1 ]; then
+  [ -f "$out" ] && die "$out exists; drop --new to rotate it"
+else
+  [ -f "$out" ] || die "$out does not exist; pass --new to create a new credential"
+fi
 
 k create secret generic ghcr-pull -n "$NS" \
     --type=kubernetes.io/dockerconfigjson \
@@ -152,5 +162,5 @@ printf 'applied SealedSecret to git ciphertext within a second, which is how a r
 printf 'password and its Secret came apart on 2026-11-11. Commit and merge instead:\n\n'
 printf '  git add %s && git commit\n\n' "$out"
 printf 'Then confirm the rollout pulled with the new credential:\n'
-printf '  kubectl --context sentpul rollout restart -n %s deploy/mission-control\n' "$NS"
+printf '  kubectl --context sentpul rollout restart -n %s deploy\n' "$NS"
 printf '  kubectl --context sentpul get pods -n %s -w\n' "$NS"

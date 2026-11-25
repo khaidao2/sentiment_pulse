@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ytu-staging
+  namespace: argocd
+  annotations:
+    # After ytu-environments (wave 0), so quota and isolation exist first.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/khaidao2/sentiment_pulse'
+    targetRevision: HEAD
+    path: platform-gitops/manifests
+    directory:
+      include: 'ytu-staging*.yaml'
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: ytu-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
