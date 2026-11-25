@@ -1,0 +1,236 @@
+# YTU Ops staging workloads. Code and images come from khaidao2/ytu-ops; the
+# namespace guardrails are in ytu-environments.yaml.
+#
+# Each image is pinned by tag AND digest. Promote by changing both in one PR;
+# roll back by reverting that PR.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: agent
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      # Pinned to khaibaai: fedora pulls ghcr.io/khaidao2/* very slowly.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-e4a4f88ecfdc@sha256:38e1f403da83999cc91939324c45ba1074c237bc9fa7171c15b0d555b1a84469
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discuss-adapter
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: discuss-adapter
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: discuss-adapter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: discuss-adapter
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      # Pinned to khaibaai: fedora pulls ghcr.io/khaidao2/* very slowly.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: discuss-adapter
+          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-e4a4f88ecfdc@sha256:a3c933f50f3b8fde468b817dcd976280e6dd0b030285b0a2ca329229fda97701
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discuss-adapter
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: discuss-adapter
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      # Pinned to khaibaai: fedora pulls ghcr.io/khaidao2/* very slowly.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/khaidao2/ytu-ops-web:sha-e4a4f88ecfdc@sha256:7b3480118e1019e35a38afd85cf8900fd73980b7e49c019fe57772f1234bf3b7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
