@@ -42,7 +42,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agent
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-a9cde0da55f3@sha256:261dda3177f1633ac37176cb7f29a5cc0d81f33de380ae3bf41f5e3afb1359a0
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-fcafe884c8a3@sha256:31b3325b09c6d25a6ea8deb1d7f8c3fd1125c3fcd108afbfe9f2ba374d655ba1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -170,7 +170,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: discuss-adapter
-          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-a9cde0da55f3@sha256:b84e94b039987e7f3fb8027933418c53cdccf1f6aa51291b94dc76e0939cca08
+          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-fcafe884c8a3@sha256:7831a907c95b66d0bb6162ad2784a16c368af8da79a19d3429aa1b80eefc815a
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -247,7 +247,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/khaidao2/ytu-ops-web:sha-a9cde0da55f3@sha256:542985767cdb5365dfbc5629782b44300632f366aa224da14923c3c644c09467
+          image: ghcr.io/khaidao2/ytu-ops-web:sha-fcafe884c8a3@sha256:79a39f8c4c50c3c0e24057cc9f853001037cbcbd4c709a1ab63739427d23d480
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
