@@ -96,6 +96,281 @@ dashboards:
       revision: 1
       datasource: Prometheus
 
+    # YTU Ops staging (KAN-29): service health from kube-state-metrics and cAdvisor,
+    # and request rate, 5xx ratio and p95 latency from each service's /metrics.
+    ytu-ops-staging:
+      json: |-
+        {
+          "schemaVersion": 39,
+          "title": "YTU Ops staging",
+          "uid": "ytu-ops-staging",
+          "tags": [
+            "ytu-ops",
+            "staging"
+          ],
+          "timezone": "browser",
+          "editable": true,
+          "refresh": "30s",
+          "time": {
+            "from": "now-6h",
+            "to": "now"
+          },
+          "timepicker": {},
+          "templating": {
+            "list": []
+          },
+          "annotations": {
+            "list": []
+          },
+          "panels": [
+            {
+              "id": 1,
+              "type": "stat",
+              "title": "Available replicas",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 5
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": null
+                      },
+                      {
+                        "color": "green",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "kube_deployment_status_replicas_available{namespace=\"ytu-staging\"}",
+                  "legendFormat": "{{deployment}}"
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "stat",
+              "title": "Restarts in the last hour",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 5
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "red",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ]
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (container) (increase(kube_pod_container_status_restarts_total{namespace=\"ytu-staging\"}[1h]))",
+                  "legendFormat": "{{container}}"
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "timeseries",
+              "title": "Requests per second",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 5,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "reqps"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (app_kubernetes_io_name, handler) (rate(http_requests_total{namespace=\"ytu-staging\"}[5m]))",
+                  "legendFormat": "{{app_kubernetes_io_name}} {{handler}}"
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "type": "timeseries",
+              "title": "Server error ratio (5xx)",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 5,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\",status=\"5xx\"}[5m])) / sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\"}[5m]))",
+                  "legendFormat": "{{app_kubernetes_io_name}}"
+                }
+              ]
+            },
+            {
+              "id": 5,
+              "type": "timeseries",
+              "title": "p95 latency",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 13,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "histogram_quantile(0.95, sum by (le, app_kubernetes_io_name) (rate(http_request_duration_seconds_bucket{namespace=\"ytu-staging\"}[5m])))",
+                  "legendFormat": "{{app_kubernetes_io_name}}"
+                }
+              ]
+            },
+            {
+              "id": 6,
+              "type": "timeseries",
+              "title": "Memory against limit",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 13,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"ytu-staging\",container!=\"\"}) / sum by (container) (kube_pod_container_resource_limits{namespace=\"ytu-staging\",resource=\"memory\"})",
+                  "legendFormat": "{{container}}"
+                }
+              ]
+            },
+            {
+              "id": 7,
+              "type": "timeseries",
+              "title": "CPU cores",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 21,
+                "w": 24,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"ytu-staging\",container!=\"\"}[5m]))",
+                  "legendFormat": "{{container}}"
+                }
+              ]
+            }
+          ]
+        }
+
     # The credential plane: Vault, External Secrets, and the scrape health that
     # says whether this page can be trusted at all.
     #
