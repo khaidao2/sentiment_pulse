@@ -1,0 +1,137 @@
+# PostgreSQL for YTU Ops staging. It holds the runtime database `ytu_runtime`,
+# owned by `ytu_runtime_owner`, which applies ytu-ops services/agent/migrations.
+# Odoo and the search pgvector instance get their own volumes later
+# (see the quota note in ytu-environments.yaml).
+#
+# Same image digest as the ytu-ops CI runtime tests, so staging runs the
+# migration on the version it was tested against.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: ytu-staging
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: ytu-staging
+data:
+  # Runs once, on an empty data directory.
+  10-ytu-runtime.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+      -v pw="$YTU_RUNTIME_OWNER_PASSWORD" <<'SQL'
+    CREATE ROLE ytu_runtime_owner LOGIN PASSWORD :'pw';
+    CREATE DATABASE ytu_runtime OWNER ytu_runtime_owner;
+    REVOKE ALL ON DATABASE ytu_runtime FROM PUBLIC;
+    REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+    SQL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      # Pinned to khaibaai: local-path volumes are bound to the node that created them.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16@sha256:3950ad7c3148ca2175ef1b6c36c9efbf78957ae8fbe8b3a5d7c35af50500382f
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: postgres-credentials, key: postgres-password}
+            - name: YTU_RUNTIME_OWNER_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: postgres-credentials, key: ytu-runtime-owner-password}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+            - {name: run, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0555
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
