@@ -270,7 +270,7 @@ dashboards:
               "targets": [
                 {
                   "refId": "A",
-                  "expr": "sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\",status=\"5xx\"}[5m])) / sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\"}[5m]))",
+                  "expr": "(sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\",status=\"5xx\"}[5m])) or 0 * sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\"}[5m]))) / sum by (app_kubernetes_io_name) (rate(http_requests_total{namespace=\"ytu-staging\"}[5m]))",
                   "legendFormat": "{{app_kubernetes_io_name}}"
                 }
               ]
