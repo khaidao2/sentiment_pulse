@@ -369,6 +369,73 @@ dashboards:
                   "legendFormat": "{{container}}"
                 }
               ]
+            },
+            {
+              "id": 8,
+              "type": "timeseries",
+              "title": "Approvals waiting for a person",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 0,
+                "y": 29,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max by (role) (ytu_approvals_waiting{namespace=\"ytu-staging\"})",
+                  "legendFormat": "{{role}}"
+                },
+                {
+                  "refId": "B",
+                  "expr": "1 - min(ytu_approval_store_up{namespace=\"ytu-staging\"})",
+                  "legendFormat": "runtime unreadable"
+                }
+              ]
+            },
+            {
+              "id": 9,
+              "type": "timeseries",
+              "title": "Oldest waiting approval",
+              "datasource": "Prometheus",
+              "gridPos": {
+                "x": 12,
+                "y": 29,
+                "w": 12,
+                "h": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom"
+                }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "expr": "max by (role) (ytu_approval_oldest_wait_seconds{namespace=\"ytu-staging\"})",
+                  "legendFormat": "{{role}}"
+                }
+              ]
             }
           ]
         }
