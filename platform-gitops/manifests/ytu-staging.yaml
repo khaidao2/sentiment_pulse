@@ -42,7 +42,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agent
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-4d1022617eab@sha256:f767c4783d13bbe85e7b8c192f5ab468ca77e0a4b920a379b186c3c574059bd5
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-f7c18bd76dd9@sha256:62d38b62680579323917478c6fa8efdde0d7082d87b211f09d7cb4b7f7539089
           imagePullPolicy: IfNotPresent
           # The approval API (KAN-27). It reads X-Forwarded-User and -Groups only from the
           # loopback peer, i.e. the oauth2-proxy sidecar below; any other caller gets 401.
@@ -186,7 +186,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: sweep
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-4d1022617eab@sha256:f767c4783d13bbe85e7b8c192f5ab468ca77e0a4b920a379b186c3c574059bd5
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-f7c18bd76dd9@sha256:62d38b62680579323917478c6fa8efdde0d7082d87b211f09d7cb4b7f7539089
               imagePullPolicy: IfNotPresent
               command: ["python", "-m", "ytu_agent.approvals", "sweep"]
               env:
@@ -240,7 +240,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: discuss-adapter
-          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-4d1022617eab@sha256:7965b095af8938f70a90b47e799e7b5c2956a51b9b102c2f7b450d81b058ffa5
+          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-f7c18bd76dd9@sha256:c0c326254fe3da71c4993799b778ef0a9e06d686eab5b347cba1c26399952722
           imagePullPolicy: IfNotPresent
           # Presented to the agent's /internal/notifications routes (KAN-27).
           env:
@@ -322,7 +322,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/khaidao2/ytu-ops-web:sha-4d1022617eab@sha256:7d63ec5fd81a1dba6ccfa3a81e66810c46b236aad92cadbdb7a7f88337c311c5
+          image: ghcr.io/khaidao2/ytu-ops-web:sha-f7c18bd76dd9@sha256:f74d8283e4c75224eff419eb303931cd99d4cb0ab190e1710c8f7dcf32b1cf93
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
