@@ -42,7 +42,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agent
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-55920f8c2167@sha256:c258abf33877567ac6e8ae4a559d5e2addb71faf2aa6b3d819e96a4756dd61b8
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-fe6c945d1eb4@sha256:0e5331100a397f173cc9a3d43239ce83268d5c8ab8afb6ac2ef3177bb7f2dfde
           imagePullPolicy: IfNotPresent
           # The approval API (KAN-27). It reads X-Forwarded-User and -Groups only from the
           # loopback peer, i.e. the oauth2-proxy sidecar below; any other caller gets 401.
@@ -182,7 +182,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: sweep
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-55920f8c2167@sha256:c258abf33877567ac6e8ae4a559d5e2addb71faf2aa6b3d819e96a4756dd61b8
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-fe6c945d1eb4@sha256:0e5331100a397f173cc9a3d43239ce83268d5c8ab8afb6ac2ef3177bb7f2dfde
               imagePullPolicy: IfNotPresent
               command: ["python", "-m", "ytu_agent.approvals", "sweep"]
               env:
@@ -236,7 +236,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: discuss-adapter
-          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-55920f8c2167@sha256:c65adb1786cdcee9cb7387737aac1e2f2e690fa413de46b742a3278be82c20e3
+          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-fe6c945d1eb4@sha256:2135cb89553327c1319aa3431f67b75411817d33c541136dff389562f0247d37
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -313,7 +313,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/khaidao2/ytu-ops-web:sha-55920f8c2167@sha256:7b15f5ce976c85adcb24265dcfe1247b123f717acda59e37fb1ad4c0459f54d4
+          image: ghcr.io/khaidao2/ytu-ops-web:sha-fe6c945d1eb4@sha256:c35c3bedef3fda4d387707ad4d0cbe6930adba87b359e340af28f134ffda6131
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
