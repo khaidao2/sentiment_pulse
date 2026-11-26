@@ -148,6 +148,99 @@ spec:
 ---
 # Reminds once at half of each approval window and expires it at the end (KAN-27). The
 # sweep logs one JSON line per event; nothing reaches approvers until the Discuss channel lands.
+# KAN-10 indexer. Suspended: run it by hand after a corpus change or a promotion that changes
+# the index version, with
+#   kubectl -n ytu-staging create job --from=cronjob/search-index search-index-$(date +%s)
+# The init container fetches the pinned E5 files (470 MB, sha256 checked) into an emptyDir, so
+# no PVC is spent on a model cache (ytu-staging allows 3). A sync with no changes embeds nothing.
+# The image must contain `ytu-index` (ytu-ops #34 or later).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: search-index
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: search-index
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  schedule: "0 3 * * *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: search-index
+            app.kubernetes.io/part-of: ytu-ops
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/hostname: khaibaai
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: ghcr-pull
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: fetch-model
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-9a3091828ac1@sha256:e3e5f5252f5aacf9212a4879c462f79d4e1520b5ef9efc5e5d58771d1aac8e2b
+              imagePullPolicy: IfNotPresent
+              command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
+              resources:
+                requests: {cpu: 50m, memory: 128Mi}
+                limits: {cpu: 250m, memory: 256Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - {name: models, mountPath: /models}
+          containers:
+            - name: index
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-9a3091828ac1@sha256:e3e5f5252f5aacf9212a4879c462f79d4e1520b5ef9efc5e5d58771d1aac8e2b
+              imagePullPolicy: IfNotPresent
+              command:
+                - ytu-index
+                - sync
+                - --corpus
+                - /app/data/search/corpus-v1
+                - --workspace
+                - 57682531-329e-4d87-b627-3fa03ce2cef2
+              env:
+                - name: YTU_E5_MODEL_DIR
+                  value: /models
+                - name: YTU_E5_THREADS
+                  value: "2"
+                - name: YTU_SEARCH_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef: {name: search-postgres-credentials, key: owner-url}
+              resources:
+                requests: {cpu: 100m, memory: 512Mi}
+                limits: {cpu: 750m, memory: 1536Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - {name: models, mountPath: /models, readOnly: true}
+          volumes:
+            - name: models
+              emptyDir:
+                sizeLimit: 1Gi
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:

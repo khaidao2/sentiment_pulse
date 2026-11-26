@@ -1,0 +1,150 @@
+# Search store for YTU Ops staging (KAN-10): its own Postgres + pgvector instance, per
+# ytu-ops docs/decisions.md. Database `ytu_search`, owned by `ytu_search_owner`, which applies
+# ytu-ops services/agent/search_migrations and runs the indexer. The agent will read it as
+# `ytu_search_agent`, a member of `ytu_search_reader` (SELECT on the live_chunk view only).
+#
+# Same image digest as the ytu-ops CI job `search-index`.
+#
+# NEEDS BEFORE MERGE: ytu-staging-search-postgres-sealed-secret.yaml with the Secret
+# `search-postgres-credentials` (keys: postgres-password, ytu-search-owner-password,
+# ytu-search-agent-password, owner-url, agent-url). See the PR description.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: search-postgres-data
+  namespace: ytu-staging
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: search-postgres-init
+  namespace: ytu-staging
+data:
+  # Runs once, on an empty data directory. The extension is created here, as superuser, so the
+  # owner's migration only finds it (CREATE EXTENSION IF NOT EXISTS).
+  10-ytu-search.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+      -v owner_pw="$YTU_SEARCH_OWNER_PASSWORD" -v agent_pw="$YTU_SEARCH_AGENT_PASSWORD" <<'SQL'
+    CREATE ROLE ytu_search_owner LOGIN PASSWORD :'owner_pw';
+    CREATE ROLE ytu_search_reader NOLOGIN;
+    CREATE ROLE ytu_search_agent LOGIN PASSWORD :'agent_pw' IN ROLE ytu_search_reader;
+    CREATE DATABASE ytu_search OWNER ytu_search_owner;
+    REVOKE ALL ON DATABASE ytu_search FROM PUBLIC;
+    GRANT CONNECT ON DATABASE ytu_search TO ytu_search_reader;
+    REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+    \c ytu_search
+    CREATE EXTENSION vector;
+    SQL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-postgres
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: search-postgres
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: search-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: search-postgres
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      # Pinned to khaibaai: local-path volumes are bound to the node that created them.
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: search-postgres-credentials, key: postgres-password}
+            - name: YTU_SEARCH_OWNER_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: search-postgres-credentials, key: ytu-search-owner-password}
+            - name: YTU_SEARCH_AGENT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: search-postgres-credentials, key: ytu-search-agent-password}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          # Small on purpose: limits.cpu in ytu-staging is 4 and the indexer job needs 750m.
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+            - {name: run, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: search-postgres-data
+        - name: init
+          configMap:
+            name: search-postgres-init
+            defaultMode: 0555
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-postgres
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: search-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
