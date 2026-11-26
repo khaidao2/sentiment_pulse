@@ -44,6 +44,16 @@ spec:
         - name: agent
           image: ghcr.io/khaidao2/ytu-ops-agent:sha-55920f8c2167@sha256:c258abf33877567ac6e8ae4a559d5e2addb71faf2aa6b3d819e96a4756dd61b8
           imagePullPolicy: IfNotPresent
+          # The approval API (KAN-27). It reads X-Forwarded-User and -Groups only from the
+          # loopback peer, i.e. the oauth2-proxy sidecar below; any other caller gets 401.
+          env:
+            - name: YTU_RUNTIME_DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: runtime-agent-credentials, key: url}
+            - name: YTU_WORKSPACE_ID
+              value: 57682531-329e-4d87-b627-3fa03ce2cef2
+            - name: YTU_APPROVER_ROLES
+              value: warehouse_lead,cs_lead,finance
           ports:
             - containerPort: 8080
               name: http
@@ -131,6 +141,62 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+# Reminds once at half of each approval window and expires it at the end (KAN-27). The
+# sweep logs one JSON line per event; nothing reaches approvers until the Discuss channel lands.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: approval-sweep
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: approval-sweep
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 240
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: approval-sweep
+            app.kubernetes.io/part-of: ytu-ops
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/hostname: khaibaai
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: ghcr-pull
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sweep
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-55920f8c2167@sha256:c258abf33877567ac6e8ae4a559d5e2addb71faf2aa6b3d819e96a4756dd61b8
+              imagePullPolicy: IfNotPresent
+              command: ["python", "-m", "ytu_agent.approvals", "sweep"]
+              env:
+                - name: YTU_RUNTIME_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef: {name: runtime-agent-credentials, key: url}
+              resources:
+                requests: {cpu: 10m, memory: 64Mi}
+                limits: {cpu: 200m, memory: 128Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
 ---
 apiVersion: apps/v1
 kind: Deployment
