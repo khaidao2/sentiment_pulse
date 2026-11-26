@@ -54,6 +54,10 @@ spec:
               value: 57682531-329e-4d87-b627-3fa03ce2cef2
             - name: YTU_APPROVER_ROLES
               value: warehouse_lead,cs_lead,finance
+            # Serves the notice outbox at /internal/notifications to the Discuss adapter.
+            - name: YTU_NOTIFY_TOKEN
+              valueFrom:
+                secretKeyRef: {name: notify-service-token, key: token}
           ports:
             - containerPort: 8080
               name: http
@@ -238,6 +242,11 @@ spec:
         - name: discuss-adapter
           image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-55920f8c2167@sha256:c65adb1786cdcee9cb7387737aac1e2f2e690fa413de46b742a3278be82c20e3
           imagePullPolicy: IfNotPresent
+          # Presented to the agent's /internal/notifications routes (KAN-27).
+          env:
+            - name: YTU_NOTIFY_TOKEN
+              valueFrom:
+                secretKeyRef: {name: notify-service-token, key: token}
           ports:
             - containerPort: 8080
               name: http
