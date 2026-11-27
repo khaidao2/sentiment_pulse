@@ -45,7 +45,7 @@ spec:
       # fetched into an emptyDir on each pod start (no PVC: quota of 3, Odoo needs one).
       initContainers:
         - name: fetch-model
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-87f58496bd3b@sha256:9a97e49a721aaa61bf644b9511bda9220bd7e2f17fc215bd47579b9c008ff979
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
           imagePullPolicy: IfNotPresent
           command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
           resources:
