@@ -40,6 +40,24 @@ spec:
         runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+        fsGroup: 10001
+      # KAN-12: /api/search loads multilingual-e5-small at start-up. The pinned weights are
+      # fetched into an emptyDir on each pod start (no PVC: quota of 3, Odoo needs one).
+      initContainers:
+        - name: fetch-model
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-87f58496bd3b@sha256:9a97e49a721aaa61bf644b9511bda9220bd7e2f17fc215bd47579b9c008ff979
+          imagePullPolicy: IfNotPresent
+          command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: models, mountPath: /models}
       containers:
         - name: agent
           image: ghcr.io/khaidao2/ytu-ops-agent:sha-87f58496bd3b@sha256:9a97e49a721aaa61bf644b9511bda9220bd7e2f17fc215bd47579b9c008ff979
@@ -58,9 +76,24 @@ spec:
             - name: YTU_NOTIFY_TOKEN
               valueFrom:
                 secretKeyRef: {name: notify-service-token, key: token}
+            # POST /api/search (KAN-12) over the corpus shipped in the image.
+            - name: YTU_SEARCH_CORPUS_DIR
+              value: /app/data/search/corpus-v1
+            - name: YTU_E5_MODEL_DIR
+              value: /models
+            - name: YTU_SEARCH_OPERATOR_ROLES
+              value: warehouse_lead,cs_lead,finance
+            - name: YTU_SEARCH_LOG_KEY
+              valueFrom:
+                secretKeyRef: {name: search-log-key, key: log-key}
           ports:
             - containerPort: 8080
               name: http
+          # The index is embedded at import; allow up to 5 minutes before liveness applies.
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /healthz, port: http}
             periodSeconds: 10
@@ -79,6 +112,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: models
+              mountPath: /models
+              readOnly: true
         # Signs people in through Keycloak (realm data-platform, client ytu-staging) and is the
         # only way in from outside the pod: it overwrites X-Forwarded-User and -Groups, which
         # the approval API trusts. Serves the web UI at / and the agent API at /api/.
@@ -130,6 +166,9 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        - name: models
+          emptyDir:
+            sizeLimit: 1Gi
 ---
 apiVersion: v1
 kind: Service
