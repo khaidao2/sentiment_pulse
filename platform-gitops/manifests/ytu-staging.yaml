@@ -194,7 +194,7 @@ spec:
               type: RuntimeDefault
           initContainers:
             - name: fetch-model
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-9a3091828ac1@sha256:e3e5f5252f5aacf9212a4879c462f79d4e1520b5ef9efc5e5d58771d1aac8e2b
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-87f58496bd3b@sha256:9a97e49a721aaa61bf644b9511bda9220bd7e2f17fc215bd47579b9c008ff979
               imagePullPolicy: IfNotPresent
               command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
               resources:
@@ -209,7 +209,7 @@ spec:
                 - {name: models, mountPath: /models}
           containers:
             - name: index
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-9a3091828ac1@sha256:e3e5f5252f5aacf9212a4879c462f79d4e1520b5ef9efc5e5d58771d1aac8e2b
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-87f58496bd3b@sha256:9a97e49a721aaa61bf644b9511bda9220bd7e2f17fc215bd47579b9c008ff979
               imagePullPolicy: IfNotPresent
               command:
                 - ytu-index
