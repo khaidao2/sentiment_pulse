@@ -254,7 +254,7 @@ spec:
                 - ytu-index
                 - sync
                 - --corpus
-                - /app/data/search/corpus-v1
+                - /app/data/search/corpus-v2
                 - --workspace
                 - 57682531-329e-4d87-b627-3fa03ce2cef2
               env:
