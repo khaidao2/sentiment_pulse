@@ -76,6 +76,18 @@ spec:
             - name: YTU_NOTIFY_TOKEN
               valueFrom:
                 secretKeyRef: {name: notify-service-token, key: token}
+            # Odoo for the dispatcher (KAN-26, ytu-ops #42): the app builds it when the runtime
+            # database and YTU_ODOO_URL are both set. All four must be set together.
+            - name: YTU_ODOO_URL
+              value: http://odoo.ytu-staging.svc.cluster.local:8069
+            - name: YTU_ODOO_DATABASE
+              value: ytu_odoo
+            - name: YTU_ODOO_API_KEY
+              valueFrom:
+                secretKeyRef: {name: agent-odoo-credentials, key: api-key}
+            # A service identity, not a person: uuid5(URL, ".../services/reconciliation").
+            - name: YTU_RECONCILIATION_OWNER_ID
+              value: cfcbf129-30e3-5f90-a481-d4c7697e3dcc
             # POST /api/search (KAN-12) over the corpus shipped in the image.
             - name: YTU_SEARCH_CORPUS_DIR
               value: /app/data/search/corpus-v2
