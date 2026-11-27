@@ -90,6 +90,12 @@ spec:
           args:
             - |
               set -eu
+              # A new pod can be refused for a few seconds until the network policy knows its IP.
+              n=0
+              until pg_isready -q -h "$PGHOST" -p 5432; do
+                n=$((n + 1)); [ "$n" -lt 60 ] || { echo "postgres not reachable" >&2; exit 1; }
+                sleep 2
+              done
               psql -v ON_ERROR_STOP=1 -d postgres -v pw="$ODOO_DB_PASSWORD" <<'SQL'
               SELECT 'CREATE ROLE ytu_odoo LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ytu_odoo')\gexec
               ALTER ROLE ytu_odoo LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'pw';
