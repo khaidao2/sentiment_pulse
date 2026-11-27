@@ -78,7 +78,7 @@ spec:
                 secretKeyRef: {name: notify-service-token, key: token}
             # POST /api/search (KAN-12) over the corpus shipped in the image.
             - name: YTU_SEARCH_CORPUS_DIR
-              value: /app/data/search/corpus-v1
+              value: /app/data/search/corpus-v2
             - name: YTU_E5_MODEL_DIR
               value: /models
             - name: YTU_SEARCH_OPERATOR_ROLES
