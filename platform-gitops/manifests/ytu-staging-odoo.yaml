@@ -1,0 +1,240 @@
+# Odoo 19 for YTU Ops staging (KAN-26, KAN-27): the system of record the agent reserves stock in
+# through ytu_agent.gateway, and later where approvers sign in with Keycloak.
+#
+# - Image: ghcr.io/khaidao2/ytu-ops-odoo, the odoo:19.0 digest the ytu-ops odoo-addon CI job tests
+#   plus odoo/addons. Promotions bump it with the other ytu-ops images.
+# - Database `ytu_odoo`, owned by role `ytu_odoo`, on the staging Postgres (`postgres`): the quota
+#   note in ytu-environments.yaml counts that volume as the Odoo database. The filestore is the
+#   third PVC.
+# - odoo.conf comes from the sealed secret odoo-credentials: it carries the database and master
+#   passwords. list_db is off and dbfilter pins the one database.
+# - Internal only: Service odoo:8069 for the agent. A public hostname (cloudflared + DNS) and the
+#   Keycloak client come with the approver UI (KAN-27).
+#
+# ORDERING, as in sentiment-pulse-web-migrate.yaml: the PVC is wave -1, the bootstrap Job wave 0,
+# the Deployment wave 1, so a failed install or upgrade leaves the running Odoo untouched. The Job
+# re-runs on every sync (Force=true,Replace=true); both of its steps are idempotent.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: odoo-filestore
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: odoo
+    app.kubernetes.io/part-of: ytu-ops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: odoo-bootstrap
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: odoo
+    app.kubernetes.io/component: bootstrap
+    app.kubernetes.io/part-of: ytu-ops
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: odoo
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Role and database, as the Postgres superuser. Idempotent: creates what is missing and
+        # resets the role's password to the sealed one, so a rotated secret takes effect here.
+        - name: database
+          image: postgres:16@sha256:3950ad7c3148ca2175ef1b6c36c9efbf78957ae8fbe8b3a5d7c35af50500382f
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - {name: PGHOST, value: postgres}
+            - {name: PGUSER, value: postgres}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: postgres-credentials, key: postgres-password}
+            - name: ODOO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: odoo-credentials, key: db-password}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              psql -v ON_ERROR_STOP=1 -d postgres -v pw="$ODOO_DB_PASSWORD" <<'SQL'
+              SELECT 'CREATE ROLE ytu_odoo LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ytu_odoo')\gexec
+              ALTER ROLE ytu_odoo LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'pw';
+              SELECT 'CREATE DATABASE ytu_odoo OWNER ytu_odoo ENCODING ''UTF8'' TEMPLATE template0'
+                WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ytu_odoo')\gexec
+              REVOKE ALL ON DATABASE ytu_odoo FROM PUBLIC;
+              SQL
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      containers:
+        # Install the modules on an empty database, upgrade ytu_commerce on an existing one.
+        - name: modules
+          image: ghcr.io/khaidao2/ytu-ops-odoo:sha-bb2a1f1c0954@sha256:b56194f87745614c2fcb51d8d88bf852d6bd1be81a7c7b7d0b7e2992268fb512
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 100
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command: ["odoo"]
+          args:
+            - --config=/etc/odoo/odoo.conf
+            - --database=ytu_odoo
+            - --init=auth_oauth,ytu_commerce
+            - --update=ytu_commerce
+            - --without-demo=all
+            - --stop-after-init
+            - --no-http
+          resources:
+            requests: {cpu: 100m, memory: 384Mi}
+            limits: {cpu: 750m, memory: 1Gi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/odoo, readOnly: true}
+            - {name: filestore, mountPath: /var/lib/odoo}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          secret:
+            secretName: odoo-credentials
+            items: [{key: odoo.conf, path: odoo.conf}]
+        - name: filestore
+          persistentVolumeClaim:
+            claimName: odoo-filestore
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: odoo
+    app.kubernetes.io/part-of: ytu-ops
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  # One pod owns the RWO filestore; Recreate avoids two writers during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: odoo
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: odoo
+        app.kubernetes.io/component: server
+        app.kubernetes.io/part-of: ytu-ops
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: khaibaai
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: odoo
+          image: ghcr.io/khaidao2/ytu-ops-odoo:sha-bb2a1f1c0954@sha256:b56194f87745614c2fcb51d8d88bf852d6bd1be81a7c7b7d0b7e2992268fb512
+          imagePullPolicy: IfNotPresent
+          command: ["odoo"]
+          args: ["--config=/etc/odoo/odoo.conf"]
+          ports:
+            - containerPort: 8069
+              name: http
+          startupProbe:
+            httpGet: {path: /web/health, port: http}
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /web/health, port: http}
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /web/health, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {cpu: 750m, memory: 1536Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /etc/odoo, readOnly: true}
+            - {name: filestore, mountPath: /var/lib/odoo}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          secret:
+            secretName: odoo-credentials
+            items: [{key: odoo.conf, path: odoo.conf}]
+        - name: filestore
+          persistentVolumeClaim:
+            claimName: odoo-filestore
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: odoo
+  namespace: ytu-staging
+  labels:
+    app.kubernetes.io/name: odoo
+    app.kubernetes.io/part-of: ytu-ops
+spec:
+  selector:
+    app.kubernetes.io/name: odoo
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 8069
+      targetPort: http

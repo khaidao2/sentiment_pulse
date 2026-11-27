@@ -13,11 +13,13 @@ metadata:
   name: compute-quota
   namespace: ytu-staging
 spec:
+  # Raised for Odoo (KAN-26): Odoo plus its bootstrap Job add 1.5 CPU / 2.5Gi of limits, and
+  # the agent's rolling update needs room for a second pod. khaibaai has the headroom.
   hard:
     requests.cpu: "2"
-    requests.memory: 3Gi
-    limits.cpu: "4"
-    limits.memory: 6Gi
+    requests.memory: 4Gi
+    limits.cpu: "6"
+    limits.memory: 8Gi
     pods: "12"
     persistentvolumeclaims: "3"
     requests.storage: 30Gi
