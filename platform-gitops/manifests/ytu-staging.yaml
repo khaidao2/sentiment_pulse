@@ -45,7 +45,7 @@ spec:
       # fetched into an emptyDir on each pod start (no PVC: quota of 3, Odoo needs one).
       initContainers:
         - name: fetch-model
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-88ea93aba2fa@sha256:343e9c4b9d1b58bdef78c809d8392b2d9c197ddddf8417f10c8a13ee5ab82d92
           imagePullPolicy: IfNotPresent
           command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
           resources:
@@ -60,7 +60,7 @@ spec:
             - {name: models, mountPath: /models}
       containers:
         - name: agent
-          image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
+          image: ghcr.io/khaidao2/ytu-ops-agent:sha-88ea93aba2fa@sha256:343e9c4b9d1b58bdef78c809d8392b2d9c197ddddf8417f10c8a13ee5ab82d92
           imagePullPolicy: IfNotPresent
           # The approval API (KAN-27). It reads X-Forwarded-User and -Groups only from the
           # loopback peer, i.e. the oauth2-proxy sidecar below; any other caller gets 401.
@@ -233,7 +233,7 @@ spec:
               type: RuntimeDefault
           initContainers:
             - name: fetch-model
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-88ea93aba2fa@sha256:343e9c4b9d1b58bdef78c809d8392b2d9c197ddddf8417f10c8a13ee5ab82d92
               imagePullPolicy: IfNotPresent
               command: ["ytu-index", "fetch-model", "--model-dir", "/models"]
               resources:
@@ -248,7 +248,7 @@ spec:
                 - {name: models, mountPath: /models}
           containers:
             - name: index
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-88ea93aba2fa@sha256:343e9c4b9d1b58bdef78c809d8392b2d9c197ddddf8417f10c8a13ee5ab82d92
               imagePullPolicy: IfNotPresent
               command:
                 - ytu-index
@@ -318,7 +318,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: sweep
-              image: ghcr.io/khaidao2/ytu-ops-agent:sha-e3672fad0232@sha256:0f26ad55745a17e0791ebb523df7c8ad203e131ac1bc08f6eb56bea367f4da78
+              image: ghcr.io/khaidao2/ytu-ops-agent:sha-88ea93aba2fa@sha256:343e9c4b9d1b58bdef78c809d8392b2d9c197ddddf8417f10c8a13ee5ab82d92
               imagePullPolicy: IfNotPresent
               command: ["python", "-m", "ytu_agent.approvals", "sweep"]
               env:
@@ -372,7 +372,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: discuss-adapter
-          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-e3672fad0232@sha256:8444d01b725de076639ced3845e2294dbbc87f76d936e35cd3675cb37d6f049f
+          image: ghcr.io/khaidao2/ytu-ops-discuss-adapter:sha-88ea93aba2fa@sha256:080f7d64cf8dfbda49c5e81b4ba7177e53375683a0b7bf729daa8d83f8ab2d6c
           imagePullPolicy: IfNotPresent
           # Presented to the agent's /internal/notifications routes (KAN-27).
           env:
@@ -454,7 +454,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/khaidao2/ytu-ops-web:sha-e3672fad0232@sha256:e13ad0a7ffdb8502433a166aae3e3a620b362607ff6296313230d730aef95aaf
+          image: ghcr.io/khaidao2/ytu-ops-web:sha-88ea93aba2fa@sha256:0f88423d690e78b5ab43b110f521ede442c4e7c836a7f4cfdf06f08ed175c5a8
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
