@@ -102,6 +102,9 @@ spec:
               SELECT 'CREATE DATABASE ytu_odoo OWNER ytu_odoo ENCODING ''UTF8'' TEMPLATE template0'
                 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ytu_odoo')\gexec
               REVOKE ALL ON DATABASE ytu_odoo FROM PUBLIC;
+              -- Odoo checks that its database exists through `postgres`, where staging revokes
+              -- CONNECT from PUBLIC; CONNECT alone reads nothing there.
+              GRANT CONNECT ON DATABASE postgres TO ytu_odoo;
               SQL
           resources:
             requests: {cpu: 20m, memory: 32Mi}
