@@ -11,7 +11,7 @@
 # - Internal only: Service odoo:8069 for the agent. A public hostname (cloudflared + DNS) and the
 #   Keycloak client come with the approver UI (KAN-27).
 #
-# ORDERING, as in sentiment-pulse-web-migrate.yaml: the PVC is wave -1, the bootstrap Job wave 0,
+# ORDERING, as in sentiment-pulse-web-migrate.yaml: the PVC and the bootstrap Job are wave 0,
 # the Deployment wave 1, so a failed install or upgrade leaves the running Odoo untouched. The Job
 # re-runs on every sync (Force=true,Replace=true); both of its steps are idempotent.
 ---
@@ -23,8 +23,10 @@ metadata:
   labels:
     app.kubernetes.io/name: odoo
     app.kubernetes.io/part-of: ytu-ops
+  # Same wave as the bootstrap Job, not earlier: local-path binds on first consumer, so a PVC in
+  # its own earlier wave stays Pending and Argo never leaves that wave.
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   accessModes: [ReadWriteOnce]
   storageClassName: local-path
